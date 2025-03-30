@@ -50,7 +50,7 @@ Put here all the necessary api calls ...
 
 
 ## Members of the Team 
-1. NIKOLAOS ANAGNOSTOU [@gmail.com]
+1. NIKOLAOS ANAGNOSTOU [nikos.r.anagnostou@gmail.com]
 2. ILIAS MAKRAS [@gmail.com]
 3. NIKOLAOS LAPPAS [@gmail.com]
 4. [@gmail.com]
