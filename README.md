@@ -1,7 +1,7 @@
 # ESA Computer In A Room Challenge (CIARC) 3 - SPACE TRANSFORMERS TEAM
 
 ## Description
-In this challenge we were called to create an autonomous system that manages tasks and controls a Satellite - MELVIN - in space. More precisely, the tasks we were given were:
+In this challenge of esa https://www.esa.int/Education/Engagement/Applications_are_now_open_for_the_ESA_Academy_s_Computer_In_A_Room_Challenge_CIARC_3 we were called to create an autonomous system that manages tasks and controls a Satellite - MELVIN - in space. More precisely, the tasks we were given were:
 1. **Daily Map**: Capture and update the global map of MELVIN's world, 
 2. **Zoned Objectives**: Capture specific zone images with predifined lens,
 3. **Secret Objectives**: Recognise and stitch together images of uknown locations containing hidden sprites for identification,
