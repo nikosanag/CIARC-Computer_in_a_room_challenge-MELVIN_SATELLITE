@@ -2,10 +2,10 @@
 
 ## Description
 In this challenge we were called to create an autonomous system that manages tasks and controls a Satellite - MELVIN - in space. More precisely, the tasks we were given were:
-    1. Daily Map, capture the map of MELVIN world,
-    2. Zoned Objectives, capture images of a specific zone, with predifined lens,
-    3. Secret Objectives, recognise and stitch together images of uknown locations that contain a sprite,
-    4. Emergency Beacon (EB), detect distress signals from anywhere in the worldn and estimate their location.
+1. **Daily Map**: Capture and update the global map of MELVIN's world, 
+2. **Zoned Objectives**: Capture specific zone images with predifined lens,
+3. **Secret Objectives**: Recognise and stitch together images of uknown locations containing hidden sprites for identification,
+4. **Emergency Beacon (EB)**: Detect distress signals worldwide and estimate their location.
 
 
 ## Installation
