@@ -9,17 +9,11 @@ HEADERS = {"User-Agent": "curl/7.68.0", "Content-Type": "application/json"}
 MAXIMUM_BATTERY = 100
 MINIMUM_BATTERY_CHECK = 5
 
-
-''' Fucntion to take pictures and save with a specific name in a directory named "images" 
-@params
-precision: 1 for "wide", 
-           6 for "narrow" and 
-           8 for "normal" 
-'''
 PHOTO_FOLDER = "images"  # Folder to save images
 
 def take_photo(): 
-    """Capture an image and save it with coordinates as the name."""
+    '''Fucntion to take pictures and save with a specific name in a directory named "images".'''
+           
     if DEBUG:
         simulation(False,1)
     time.sleep(0.5)
@@ -43,8 +37,9 @@ def take_photo():
     return filename 
 
 
-''' Only for debugging reasons '''
 def simulation(simulation,speed):
+    ''' Only for debugging reasons '''
+
     payload = {
             "is_network_simulation" : simulation, 
             "user_speed_multiplier" : speed
@@ -52,10 +47,9 @@ def simulation(simulation,speed):
     response = requests.put(f"{MELVIN_BASE_URL}/simulation", params=payload)
     return
 
-
-''' Get MELVIN status '''
 def get_observation():
-    """Retrieve MELVIN's observation data."""
+    '''Retrieve MELVIN's observation data.'''
+           
     try:
         # print(f"[DEBUG] Sending GET request to {MELVIN_BASE_URL}/observation")
         response = requests.get(f"{MELVIN_BASE_URL}/observation")
@@ -68,25 +62,26 @@ def get_observation():
         return get_observation()
 
 
-''' Control MELVIN's speed and camera angle
-@params
-mode: acquisition, communication, charge
-x: velocity x axis
-y: velocity y axis
-angle: wide, narrow, normal
-'''
 def set_mode(mode, x, y, angle):
-    """Set MELVIN's mode (e.g., acquisition or safe)."""
+    ''' 
+    Control MELVIN's state, velocity and camera angle.
+    
+    :param mode: (str) e.g. 'acquisition', 'communication', 'charge'
+    :param x: (float) velocity x axis
+    :param y: (float) velocity y axis
+    :param angle: (str) e.g. 'wide', 'narrow', 'normal'
+    '''
     payload = {"state": mode, "vel_x": x, "vel_y": y, "camera_angle": angle}
     response = requests.put(f"{MELVIN_BASE_URL}/control", json=payload)
     response.raise_for_status()
 
 
-''' Function to make sure MELVIN changed to desired mode
-@params
-new: desired new mode
-'''
 def wait(new):
+    ''' 
+    Function to make sure MELVIN changed to desired mode.
+    
+    :param new: (str) Desired new mode
+    '''
     while True:
         check_wait = get_observation()
         set_mode(new, check_wait["vx"], check_wait["vy"], check_wait["angle"])
@@ -100,11 +95,13 @@ def wait(new):
     return
 
 
-''' Make sure MELVIN never enters safe mode 
-@params
-prev_mode: mode it had before entering safe mode -> in order to set this mode before returning
-'''
 def safe(prev_mode="acquisition"): # Not necessarily acquisition, but to be safe I set it as default
+    ''' 
+    Make sure MELVIN never enters safe mode. 
+
+    :param prev_mode: (str) Mode it had before entering safe mode -> in order to set this mode before returning
+    '''
+
     check = get_observation()
     if check["state"] == "safe":
         if DEBUG:
@@ -120,12 +117,14 @@ def safe(prev_mode="acquisition"): # Not necessarily acquisition, but to be safe
     return
 
 
-''' Protect battery leak, not to drop more that the desired threshold '
-@params
-x: threshold for minimum battery acceptable
-angle: wide, narrow, normal
-'''
 def protect_battery(x, angle="wide", prev_mode="acquisition"):
+    ''' 
+    Protect battery leak, not to drop more that the desired threshold. 
+    
+    :param x: (int) Threshold for minimum battery acceptable
+    :param angle: (str) e.g. 'wide', 'narrow', 'normal'
+    '''
+
     global MAXIMUM_BATTERY
 
     check1 = get_observation()
@@ -168,8 +167,9 @@ def protect_battery(x, angle="wide", prev_mode="acquisition"):
     return
 
 
-''' Return available slots '''
 def get_slots():
+    ''' Return available slots. '''
+           
     try:
         #print(f"[DEBUG] Sending GET request to {MELVIN_BASE_URL}/slots")
         response = requests.get(f"{MELVIN_BASE_URL}/slots")
@@ -183,11 +183,13 @@ def get_slots():
         return None
     
 
-''' Check for the timestamps, and book wisely 
-@params
-des_time: Desired time to have booked a slot (format: "%Y-%m-%dT%H:%M:%S.6fZ")
-'''
 def check_for_next_slot(des_time):
+    ''' 
+    Check for the timestamps, and book wisely. 
+    
+    :param des_time: Desired time to have booked a slot (format: "%Y-%m-%dT%H:%M:%S.6fZ")
+    '''
+
     response = get_slots()
     for slot in response:
         slot_id = slot.get("id")
@@ -210,11 +212,13 @@ def check_for_next_slot(des_time):
     return
 
 
-''' Book one slot 
-@params
-slot_id: The id of the desired slot to book
-'''
 def book_slot(slot_id):
+    ''' 
+    Book one slot. 
+
+    :param slot_id: (int) The id of the desired slot to book
+    '''
+
     try:
         #print(f"[DEBUG] Sending PUT request to {MELVIN_BASE_URL}/slots")
         payload = {
