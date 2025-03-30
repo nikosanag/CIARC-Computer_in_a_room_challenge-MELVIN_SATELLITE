@@ -1,7 +1,11 @@
-# ESA Computer In A Room Challenge (CIARC) 3 - SPACE TRASFORMERS TEAM
+# ESA Computer In A Room Challenge (CIARC) 3 - SPACE TRANSFORMERS TEAM
 
 ## Description
-In this challenge we were called to create an autonomous system that manages and controls a Satellite - Melvin in space , so it can take pictures of the whole earth and in addition accomplish some challenges!
+In this challenge we were called to create an autonomous system that manages tasks and controls a Satellite - MELVIN - in space. More precisely, the tasks we were given were:
+    1. Daily Map, capture the map of MELVIN world,
+    2. Zoned Objectives, capture images of a specific zone, with predifined lens,
+    3. Secret Objectives, recognise and stitch together images of uknown locations that contain a sprite,
+    4. Emergency Beacon (EB), detect distress signals from anywhere in the worldn and estimate their location.
 
 
 ## Installation
@@ -35,6 +39,14 @@ Example of changes to be done in order to run in a different machine
 Explain any configuration settings, environment variables, or parameters needed.
 -> Might explain how each and every program is connected with the main program 
 e.g. vel_calculation.py implemented in order to find the optimal trajectory 
+
+
+## User Console
+Here we have to write whatever is necessary for someone to run our console.....
+
+
+## Useful API Commands
+Put here all the necessary api calls ...
 
 
 ## Members of the Team 
