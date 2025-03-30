@@ -25,7 +25,7 @@ In this challenge we were called to create an autonomous system that manages and
 
 ## Usage
 **Run the main program with:**
-    ```sh
+
     python3 part4.py
 
 
