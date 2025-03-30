@@ -48,6 +48,9 @@ Here we have to write whatever is necessary for someone to run our console.....
 ## Useful API Commands
 Put here all the necessary api calls ...
 
+##usefull guide
+Generally tools folder includes nessecary scripts and functions that manages the safety needs of melvin, such as protect_battery and more. This were tools that built and serviced us from Part1
+
 
 ## Members of the Team 
 1. NIKOLAOS ANAGNOSTOU [nikos.r.anagnostou@gmail.com]
