@@ -1,7 +1,7 @@
 Here are the codes used for the contest of 2024 ciarc computer in the room challenge.
 Teammates were :
 ------------------------------------------------------------------------------------
-NIKOLAOS ANAGNOSTOU (me)
+NIKOLAOS ANAGNOSTOU 
 ILIAS MAKRAS
 NIKOLAOS LAPPAS
 ------------------------------------------------------------------------------------
