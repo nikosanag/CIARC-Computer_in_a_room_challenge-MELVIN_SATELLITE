@@ -12,13 +12,13 @@ BEACON_URL = f"{MELVIN_BASE_URL}/beacon" # PUT method
 IMAGE_URL = f"{MELVIN_BASE_URL}/image" # POST method
 DAILYMAP_URL = f"{MELVIN_BASE_URL}/dailyMap" # POST method
 
-
-''' Submitting Image objective zoned/secret 
-@params
-path: path to zoned/secret location image 
-obj_id: id of the objective
-'''
 def submit_image(obj_id, path):
+    ''' 
+    Submitting Image objective zoned/secret. 
+
+    :param obj_id: id (int) of the objective
+    :param path: path (str) to zoned/secret location image 
+    '''
     with open(path, "rb") as image_file:
         image_binary = image_file.read()
 
@@ -44,11 +44,13 @@ def submit_image(obj_id, path):
         raise Exception(f"Failed to submit objective image: {response.text}")
 
 
-''' Submitting Daily Map 
-@params
-total_map: stiched map ready for submition 
-'''
 def submit_map(total_map):
+    ''' 
+    Submitting Daily Map.
+    
+    :param total_map (.png) stiched map ready for submition 
+    '''
+    
     with open(total_map, "rb") as image_file:
         image_binary = image_file.read()
 
@@ -66,13 +68,15 @@ def submit_map(total_map):
         raise Exception(f"Failed to submit daily map: {response.text}")
 
 
-''' Submitting EB position estimation 
-@params
-id: beacon_id
-x: width
-y: height
-'''
 def submit_EB(id, x, y):
+    ''' 
+    Submitting EB position estimation.
+    
+    :param id (int) beacon_id
+    :param x (int) width
+    :param y (int) height
+    '''
+    
     #Round x and y to the nearest integer
     x = round(x)
     y = round(y)
