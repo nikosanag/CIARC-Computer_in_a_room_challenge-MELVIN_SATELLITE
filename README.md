@@ -6,7 +6,7 @@ In this challenge we were called to create an autonomous system that manages and
 
 ## Installation
 ### Prerequisites
-    - Python >= 3.7
+-Python >= 3.7
 
 ### Setup
 1. **Clone the repository:**
