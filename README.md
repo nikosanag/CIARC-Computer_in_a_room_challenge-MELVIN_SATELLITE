@@ -28,7 +28,7 @@ In this challenge of esa we were called to create an autonomous system that mana
 
 
 ## Usage
-**Run the main program with:**
+**Run the main program of Part 4 with:**
 
     python3 part4.py
 
@@ -55,7 +55,7 @@ Generally tools folder includes nessecary scripts and functions that manages the
 ## Members of the Team 
 1. NIKOLAOS ANAGNOSTOU [nikos.r.anagnostou@gmail.com]
 2. ILIAS MAKRAS [@gmail.com]
-3. NIKOLAOS LAPPAS [@gmail.com]
+3. NIKOLAOS LAPPAS [nikolas.lappas.2003@gmail.com]
 4. [@gmail.com]
 5. [@gmail.com]
 
