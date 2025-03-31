@@ -1,13 +1,13 @@
 from utility import get_observation, set_mode, wait, simulation, protect_battery, safe, take_photo, check_for_next_slot
-from submit_responses import submit_EB, submit_image, submit_map
+from submit_responses import submit_EB, submit_image
 from beacon_position_calculator import find_solution
-from objectives import get_and_sort_objectives, get_current_objectives, parse_datetime
+from objectives import get_current_objectives, parse_datetime
 from objectives_total import sort_objectives
 from vel_calculation import calculate_velocity
 from compute_time import time_computation
 from zonedStitching import stitch_zoned
+from collections import defaultdict
 
-# from mapStitching import capture_and_stitch
 import zlib
 import struct
 import traceback
@@ -23,90 +23,36 @@ import numpy as np
 import re
 import random
 import math
-import psutil
-import shutil
 import subprocess
-import signal
-# import datetime
 from datetime import datetime, timezone, timedelta
 from bitarray import bitarray
-from collections import namedtuple
-from io import BytesIO
-from PIL import Image
 
 
 DEBUG = False
 
 
-# Configuration
-Image.MAX_IMAGE_PIXELS = 233280000
 
 MELVIN_BASE_URL = "http://10.100.10.14:33000"
 HEADERS = {"User-Agent": "curl/7.68.0", "Content-Type": "application/json"}
 
 
-'''
-ΙΔΕΕΣ:
-
-1) Κοιτάμε όλα τα objectives και τα παιρνουμε με τη σειρα που εχουν ερθει ΣΚΙΠΑΡΟΝΤΑΣ τα unknown 
-ΚΑΙ ΒΛΕΠΟΥΜΕ
-2) 
-
-
-
-
----> Πρώτα κοιτάμε όλα τα objectives που είναι ανοιχτά και κάνουμε αυτά ενώ τραβάμε φωτό 
-KAΘ'ΟΛΗ ΤΗ ΔΙΑΡΚΕΙΑ.Θα ενημερώνεται κατάλληλα και ο πίνακας του Νίκου.
-Ανά πάσα στιγμή, μπορεί να έρθει announcement για beacon.
-Επειδή δεν ξέρουμε πόση ώρα θα μέινει ανοιχτό το beacon, ίσως είναι καλή ίδεα να παρατήσουμε τα
-πάντα και να προσπαθήσουμε να πάρουμε τα 8 pings που χρειαζόμαστε. ΝΑ ΚΟΙΤΑΞΟΥΜΕ ΑΝ ΜΠΟΡΟΥΜΕ ΝΑ 
-ΜΕΙΩΣΟΥΜΕ ΑΥΤΟ ΤΟ THRESHOLD ΣΕ 4 PINGS. Το ψάξιμο το beacon είναι 
-διαδικάσία που (μάλλον) δεν μπορεί να διακοπεί. 
-
-Οπότε υπάρχουν 2 προβλήματα με αυτό:
-1) Πρέπει να είμαστε σίγουροι ότι όσο ψάχνουμε το beacon δεν θα λήξει κάποιο από τα objectives.
-Αν δούμε ότι κάποιο πάει να λήξει ίσως πρέπει να το φροντίσουμε πρωτού μπουμε σε communcation,
-δηλαδή όταν μπούμε σε commincation ΝΑ ΜΗΝ ΠΙΕΖΟΜΑΣΤΕ ΑΠΟ ΤΙΠΟΤΑ ΧΡΟΝΙΚΑ.
-2) Θα πρέπει να γίνει αλλαγή στο πως ψάχνουμε το beacon. Το vy = 40 και vx = 4 ΔΕΝ μπορούν να
-δουλέψουν πλέον λόγω καυσίμου. Θα πρέπει να έχουμε μεγαλύτερη κλίση και μόλις λάβουμε πρώτη
-φορά ping και βγούμε από τον κύκλο. --> (Λαπ) Προτείνω να ψάνουμε το beacon με την ταχύτητα που ήδη έχει
-ο ΜΕΛΒΙΝ χωρίς να την τροποποιήσουμε. Δηλαδή, μόλις δούμε ανακοίνωση για ΕΒ, να αλλάξουμε σε communication
-mode ανεξάρτητα της ταχύτητας που έχει ο ΜΕΛBIN. Και ίσως προτού αλλάζουμε σε com mode, να αποθηκεύσουμε 
-την θέση που είχαμε ώστε αν κάναμε κάτι να γνωρίζουμε που το σταματήσαμε.
-
-
-
----> Χρήση *processes* για δυναμικό stitching. Όταν ο MELVIN πάρει μια φωτογραφία, την περνάει 
-σε ένα process που θα αναλάβει αν την κολλήσει στη θέση της και εκείνος συνεχίζει τη δουλειά του.
-
-
----> Υπάρχουν και πιο "manual" λύσεις, όπως το να κρίνουμε μόνοι μας τι πρέπει να γίνει με βάση το
-/objectives και να τρέχουμε μόνοι μας αυτό που πρέπει κάθε φορά. Αυτό κατά τη γνώμη μου είναι
-ριψοκίνδυνο και σίγουρα δεν θα το εκτιμήσουν γιατί δεν έχει automation. Αλλά για λύσεις ανάγκης
-γίνεται. --> Nαι αυτό δεν θα δουλέψει ικανοποιητικά καλά μάλλον και θα έχουμε πολύ κακή διαχείριση των 
-slots ( θα χρειαζόμαστε πολλά κάτι που δεν συμφέρει από άποψη βαθμολόγησης ). Καλύτερα να αρχίσουμε με πλήρη 
-αυτοματοποίηση και σε ότι δεν καταφέρουμε συζητάμε το manually Kαι πως ....
-
-
----> Είναι καλή ιδέα να δημιουργήσουμε global μεταβλητή που δείχνει ότι λάβαμε beacon announcement
-(το αρχικό) ώστε συνέχεια να ελεέγχουμε αν έγινε true και αν έγινε να πάμε σε ρουτίνα εξυπηρέτησης
-του beacon. Αυτό ίσως θα χρειαστεί να βάλουμε εδώ τις συναρτήσεις του προγράμματος του part4 και
-όχι απλά να το κάνουμε include.
-
-'''
-
-# -------------------------------- SAFE FUNCTION (CASE OF ERROR) --------------------------
+# -------------------------------- EXCEPTION HANDLING MECHANISM (IN CASE OF ERROR) --------------------------
 EXCEPTIONS_LOG = 'exceptions.log'
 stitched_map_path = 'debug_stitched_map.png'
 
 def handler_exception(exc_type, exc_value, exc_traceback):
+    '''
+    This function handles any exceptions that may occur during excecution.
+    It first sets MELVIN to "charge" mode and saves the exception and the corresponding timestamp to a file and then books the next available
+    slot, so that the operator can connect and fix the issue. Finally, it backs up the BitMatrix object
+    and it runs the program "safety_handler.py", which is a backup safety program that only captures the
+    map.
+    '''
 
     global Map
-    # Check for safe mode occurance ...
     safe("charge")
 
-    # ---------------------------------------------------------------------------
-    # Save the Traceback error ...
+
     """Log exceptions with detailed diagnostics."""
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
@@ -137,28 +83,15 @@ def handler_exception(exc_type, exc_value, exc_traceback):
         f"\n{'=' * 80}\n"
     )
 
-    # Low-level file handling to minimize memory usage
     fd = os.open(EXCEPTIONS_LOG, os.O_APPEND | os.O_CREAT | os.O_WRONLY)
     os.write(fd, log_entry.encode())  # Convert string to bytes before writing
     os.close(fd)  # Close the file descriptor
-    # ---------------------------------------------------------------------------
 
-    # Booking the next slot available ...
-    current_time = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
-    check_for_next_slot(current_time) # Booking the first available slot if not already booked
+    # Books the next slot available
+    current_time = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+    check_for_next_slot(current_time)
 
     Map.save_to_file("backup_map.bmap")
-
-    # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-    # Start map process only capture and get
-    # os.system("python3 safety_handler.py") # Might need to take the already stitched map and continue stitching it
-
-    # result = subprocess.run(["python3", "safety_handler.py"], capture_output=True, text=True)
-    # if DEBUG:
-    #     print("Return code:", result.returncode)
-    #     print("Output:", result.stdout)
-    #     print("Error:", result.stderr)
 
     # Launch safety handler as a proper subprocess
     handler_path = os.path.join(os.path.dirname(__file__), "safety_handler.py")
@@ -172,7 +105,6 @@ def handler_exception(exc_type, exc_value, exc_traceback):
     
     print(f"[ERROR] Parent PID={os.getpid()} crashing. Subprocess PID={proc.pid}")
     sys.exit(1)
-    # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
 def thread_exception_handler(args):
@@ -194,133 +126,21 @@ threading.excepthook = thread_exception_handler
 
 
 
-# ---------------------------------- THREAD TO MONITOR OBJECTIVES ----------------------------------
+# ---------------------------------- KNOWN LOCATION OBJECTIVE MONITORING THREAD ----------------------------------
 objective_queue = queue.Queue()
 
 objective_available = threading.Event()
 
-OBJECTIVE_LOG_FILE_PATH = "objective_log.txt"
-beacon_start_time = {}
-beacon_end_time = {}
-zoned_start_time = {}
-zoned_end_time={}
-# started_beacon_objectives = []
-# started_zoned_objectives = []
-# sorted_beacon_objectives = []
-# sorted_zoned_objectives = []
-
-
-
-
-def objective_logger_thread():
-    # Ensure the log file exists
-    if not os.path.exists(OBJECTIVE_LOG_FILE_PATH):
-        try:
-            with open(OBJECTIVE_LOG_FILE_PATH, "w") as file:
-                file.write("")
-            if DEBUG:
-                print(f"[INFO] Created log file: {OBJECTIVE_LOG_FILE_PATH}")
-        except PermissionError:
-            print("[ERROR] Cannot create log file due to permission error.")
-            return
-
-    while True:
-        try:
-            # Step 1: Read logged objective IDs (cleared every loop)
-            logged_ids = set()
-            with open(OBJECTIVE_LOG_FILE_PATH, "r") as file:
-                for line in file:
-                    if "ID:" in line:
-                        parts = line.split("ID:")
-                        if len(parts) > 1:
-                            id_str = parts[1].split(",")[0].strip()
-                            if id_str.isdigit():
-                                logged_ids.add(int(id_str))
-
-            # Step 2: Get current objectives
-            response = requests.get(f'{MELVIN_BASE_URL}/objective', headers=HEADERS)
-            response.raise_for_status()
-            objectives = response.json()
-
-
-            beacons = objectives["beacon_objectives"]
-            zoned = objectives["zoned_objectives"]
-
-            new_objectives = []
-
-            # Step 3: Find new beacon objectives
-            for beacon in beacons:
-                beacon_id = beacon["id"]
-                if beacon_id not in logged_ids:
-                    new_objectives.append(beacon)
-
-            # Step 4: Find new zoned objectives
-            for obj in zoned:
-                zoned_id = obj["id"]
-                if zoned_id not in logged_ids:
-                    new_objectives.append(obj)
-
-            # Step 5: Log new ones and clear memory
-            if DEBUG:
-                print(new_objectives)
-            if new_objectives:
-                with open(OBJECTIVE_LOG_FILE_PATH, "a") as file:
-                    for obj in new_objectives:
-                        line = (
-                            f"[NEW OBJECTIVE] ID: {obj['id']}, Name: {obj['name']}, "
-                            f"Start: {obj['start']}, End: {obj['end']}, "
-                            f"Timestamp (UTC): {datetime.now(timezone.utc)}\n"
-                        )
-
-                        file.write(line)
-
-                if DEBUG:
-                    print(f"[INFO] Logged {len(new_objectives)} new objective(s).")
-
-            # Explicitly clear large temp variables
-            # del logged_ids
-            # del new_objectives
-            # del beacons
-            # del zoned
-            # del objectives
-
-            current_t = datetime.now(timezone.utc)
-
-            global started_beacon_objectives
-            for beacon in beacons:
-                beacon_identification = beacon["id"]
-                beacon_start_time[beacon_identification] = parse_datetime(beacon['start'])
-                beacon_end_time[beacon_identification] = parse_datetime(beacon['end'])
-                # if 1:
-                if beacon_start_time[beacon_identification] <= current_t and beacon_end_time[beacon_identification] >= current_t:
-                    started_beacon_objectives.append(beacon)
-
-            sorted_beacon_objectives = sorted(
-                started_beacon_objectives,
-                key=lambda x: parse_datetime(x["end"])
-            )
-
-        except Exception as e:
-            if DEBUG:
-                print(f"[ERROR] {e}")
-
-            raise
-
-        # Wait 10 minutes
-        time.sleep(5)
-
-
-
 def objective_monitor():
-    """Thread that monitors for new objectives via API calls"""
+    """
+    Thread that monitors for new known location objectives via API calls. Every 5 seconds, it adds any new objectives detected to the objective_queue.
+    """
     
     if DEBUG:
         print("[OBJECTIVES] Started monitoring.")
     already_seen = set()
     while True:
         curr_objectives = get_current_objectives(contain_secret=False)
-        # if DEBUG:
-        #     print(f"[OBJECTIVES] Current objectives now: {curr_objectives}")
         flag = False
         for obj in curr_objectives:
             if DEBUG:
@@ -340,12 +160,19 @@ def objective_monitor():
         time.sleep(5)
 
 def start_objectives_monitoring():
+    """
+    Starts the objective monitoring thread.
+    """
     monitor_thread = threading.Thread(target=objective_monitor, daemon=True)
     monitor_thread.start()
 
-def objective_check_routine(image_queue): # def objective_check_routine(image_queue)
+def objective_check_routine(image_queue):
+    """
+    Pops any new known location objectives from the objective_queue and completes them.
+    """
 
     if not objective_available.is_set():
+        # No new objectives
         if DEBUG:
             print("[OBJECTIVES] Did not find the flag set!")
         return False
@@ -362,16 +189,14 @@ def objective_check_routine(image_queue): # def objective_check_routine(image_qu
             desired_angle = current_obj["optic_required"]
             objective_image_list = []
 
-            # --------- Be sure to keep MELVIN alive ----------
+            # Be sure to keep MELVIN alive
             safe() 
             check = get_observation()
             time.sleep(1)
             protect_battery(5, desired_angle, check["state"])
-            # -------------------------------------------------
 
 
-            # ------------------------------ From here we consider handling zoned objectives -----------------------------------
-            
+            # Start handling known location objectives
             
             now = datetime.now(timezone.utc) - timedelta(minutes=15) 
             date_str = now.strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -380,7 +205,7 @@ def objective_check_routine(image_queue): # def objective_check_routine(image_qu
             if now >= limit:
                 if DEBUG:
                     print("[OBJECTIVE FAILED] DID NOT HAVE TIME FOR OBJECTIVE")
-                with open("FAILURES.txt", "a") as file: # If it doesn't exist, then creates it
+                with open("FAILURES.txt", "a") as file:
                     file.write(f"Objective:\n{current_obj}\nFailed: Ending time had expired when we found it!.\n")
                 if objective_queue.empty():
                     objective_available.clear()
@@ -400,7 +225,6 @@ def objective_check_routine(image_queue): # def objective_check_routine(image_qu
             des_y = current_obj["zone"][3]
             already_taken_photo = False
 
-            # precise_picture = False # Flag in order to check if precise picture objective is given
 
             while True:
                 
@@ -408,21 +232,7 @@ def objective_check_routine(image_queue): # def objective_check_routine(image_qu
 
                 check = get_observation()
                 
-                # If already taken photo we should update the target point and check whether the objective in done
                 if already_taken_photo:
-                    # if precise_picture:
-                    #     if DEBUG:
-                    #         print("[OBJECTIVES] ==================== PRECISE OBJECTIVE DONE! =====================", flush=True)
-                            
-                    #         charge_check = get_observation()
-                    #         if charge_check["battery"] < 5:
-                    #             set_mode("charge", check["vx"], check["vy"], desired_angle)
-                    #             wait("charge")
-
-                    #         stitch_and_submit_obj(objective_image_list, current_obj)
-                    #         if objective_queue.empty():
-                    #             objective_available.clear()
-                    #         return True
                     
                     if desired_angle == "wide":
                         offset = 500
@@ -438,7 +248,7 @@ def objective_check_routine(image_queue): # def objective_check_routine(image_qu
                         des_x = des_x + 3*(offset // 2)
                         des_y = des_y
 
-                        if des_x > current_obj["zone"][2]: # + offset / 2:
+                        if des_x > current_obj["zone"][2]: 
                             if DEBUG:
                                 print("[OBJECTIVES] ==================== OBJECTIVE DONE! =====================", flush=True)
                             charge_check = get_observation()
@@ -446,13 +256,13 @@ def objective_check_routine(image_queue): # def objective_check_routine(image_qu
                                 set_mode("charge", check["vx"], check["vy"], desired_angle)
                                 wait("charge")
 
+                            # Objective submission
                             stitch_and_submit_obj(objective_image_list, current_obj)
-                            with open("SUCCESSES.txt", "a") as file: # If it doesn't exist, then creates it
+                            with open("SUCCESSES.txt", "a") as file: 
                                 file.write(f"Objective:\n{current_obj}\nSUCCESS\n")
                             if objective_queue.empty():
                                 objective_available.clear()
                             return True
-                            # END OF ZONED OBJECTIVE SUBMISSION
 
                 else:
                     lens = desired_angle
@@ -463,27 +273,23 @@ def objective_check_routine(image_queue): # def objective_check_routine(image_qu
                     else:
                         offset = 300
 
-                    des_y = des_y - offset #/ 2 # REMEMBER TO MODIFY
+                    des_y = des_y - offset
                 
-                    # if (current_obj["zone"][2] - current_obj["zone"][0] == offset * 2) and (current_obj["zone"][3] - current_obj["zone"][1] == offset * 2):
-                    #     des_x = des_x + offset / 2 # Going directly to the center of the precise picture
-                    #     precise_picture = True
-                    #     if DEBUG:
-                    #         print("[OBJECTIVE] Precise picture objective")
 
                 if DEBUG:
-                    print(f"[CO-PILOT OF OBJECTIVE] New desired position: ({des_x},{des_y})", flush=True)
+                    print(f"[OBJECTIVES] New desired position: ({des_x},{des_y})", flush=True)
 
                 while True:
                     if DEBUG:
                         simulation(False,1)
-                        print("[CO-PILOT OF OBJECTIVE] getting the speed order...this is a blocking command")
+                        print("[OBJECTIVES] getting the speed order...this is a blocking command")
                     check = get_observation()
                     cur_x = check["width_x"]
                     cur_y = check["height_y"]
                     cur_vx = check["vx"]
                     cur_vy = check["vy"]
 
+                    # Calculate the desired velocity in order to reach the target
                     vel_data = calculate_velocity(cur_x, cur_y, des_x, des_y, cur_vx, cur_vy)
                     current_velocity = get_observation()
 
@@ -493,41 +299,34 @@ def objective_check_routine(image_queue): # def objective_check_routine(image_qu
                     if ((current_velocity["vx"] == vel_data["vx"]) and (current_velocity["vy"] == vel_data["vy"])):
                         break
 
-                    # Time passes, set mode to 'acquisition' and begin orbiting towards the target point
+                    # Set mode to 'acquisition' and begin orbiting towards the target point
                     for _ in range(5):
                         protect_battery(6, desired_angle)
                         safe()
-                        set_mode("acquisition", vel_data["vx"], vel_data["vy"], desired_angle) # Apply the computed velocity
+                        set_mode("acquisition", vel_data["vx"], vel_data["vy"], desired_angle)
+                        # Apply the computed velocity repetedly, to make sure the final trajectory is valid 
                         wait("acquisition")
                         time.sleep(0.1)
                         if DEBUG:
                             print(f"[DEBUG] SET {desired_angle} angle")
-                    
-                        #name = take_photo()
-                        # parts = name.split('_')
-                        # x = int(parts[1])
-                        # y = int(parts[2][:-4])
-
-                        if DEBUG:
-                            simulation(False, 1)
-                        #Map.update_map(x, y, desired_angle, 1)
-                        if DEBUG:
-                            simulation(False, 20)
+ 
                         
                 if DEBUG:
                     simulation(False,20)
                 while True:
                     if DEBUG:
-                        print("[CO-PILOT OF OBJECTIVE] Checking if i am already too close.", flush=True)
+                        print("[OBJECTIVES] Checking if i am already too close.", flush=True)
                     
+                    # Find out whether MELVIN reaches the destination in time
                     can_reach = time_computation(vel_data['distance'])
                     check = get_observation()
+                    # Calculate tht ime needed in order to reach the destination
                     can_reach_time = calculate_travel_time(check['width_x'], check['height_y'], check['vx'], check['vy'], des_x, des_y)
                     if DEBUG:
-                        print(f"[CO-PILOT OF OBJECTIVE] The time we computed in order to reach desired destination: {round(can_reach[1], 1)}", flush=True)
-                        print(f"[CO-PILOT OF OBJECTIVE] Is reachable? {can_reach[0]}", flush=True)
+                        print(f"[OBJECTIVES] The time we computed in order to reach desired destination: {round(can_reach[1], 1)}", flush=True)
+                        print(f"[OBJECTIVES] Is reachable? {can_reach[0]}", flush=True)
 
-                    if can_reach[0]: # It can and it will find the target point
+                    if can_reach[0]: # MELVIN will eventually find the target point
                       
                         # Check if MELVIN is very close to the target spot
                         if round(can_reach_time, 1) < 360:
@@ -539,8 +338,8 @@ def objective_check_routine(image_queue): # def objective_check_routine(image_qu
                             if DEBUG:
                                 simulation(False, 1)
 
-                            check = get_observation() # I think this should added here ...
-                            cur_x = check["width_x"]   # giati toso palio check ???
+                            check = get_observation()
+                            cur_x = check["width_x"]  
                             cur_y = check["height_y"]
                             cur_vx = check['vx']
                             cur_vy = check['vy']
@@ -548,7 +347,7 @@ def objective_check_routine(image_queue): # def objective_check_routine(image_qu
                             des_x = current_obj["zone"][0]
                             des_y = current_obj["zone"][3] - offset
                             
-                        # Just to be sure we are heading with the optimal speed
+                       
                         if DEBUG:
                             simulation(False,20)
                         mine = get_observation()
@@ -565,15 +364,17 @@ def objective_check_routine(image_queue): # def objective_check_routine(image_qu
 
                         threshold = 20
                         time1 = float('inf')
+
+                        # Find the appropriate threshold to calculate the time needed to reach the target
                         while math.isinf(time1) and threshold <= 100:
                             time1 = calculate_travel_time(check["width_x"],check["height_y"],check["vx"],check["vy"],des_x,des_y,21600,10800,threshold)
                             threshold += 5
 
                         if DEBUG:
-                            print(f"[CO-PILOT OF OBJECTIVE] Just got sleep order time estimate in REAL time: {round(time1, 1)} and i am in simulation 1", flush=True)
+                            print(f"[OBJECTIVES] Just got sleep order time estimate in REAL time: {round(time1, 1)} and i am in simulation 1", flush=True)
                     
                         key = round(time1, 2)
-                        key = key - 180 - 60 # nikos anag - 60
+                        key = key - 180 - 60
 
                         if DEBUG:
                             key = round(key/20,2)
@@ -583,10 +384,11 @@ def objective_check_routine(image_queue): # def objective_check_routine(image_qu
                         if DEBUG:
                             simulation(False, 20)
 
+                        # Wait until MELVIN arrives to the desired position
                         safe_occured = False
                         while True:
                             if DEBUG:
-                                print(f"[CO-PILOT OF OBJECTIVE] Sleeping and remaining time is {round(key - i,2)} seconds in x20 time", flush=True)
+                                print(f"[OBJECTIVES] Sleeping and remaining time is {round(key - i,2)} seconds in x20 time", flush=True)
                             time.sleep(1)
                             state = get_observation()
                             if state["state"] == "safe":
@@ -599,16 +401,14 @@ def objective_check_routine(image_queue): # def objective_check_routine(image_qu
                                 break
                         break
                     
-                    #else we need to terminate this
-                
                 if safe_occured:
                     continue
 
                 if DEBUG:
-                    print("[CO-PILOT OF OBJECTIVE] Getting ready to reach target", flush=True)
+                    print("[OBJECTIVES] Getting ready to reach target", flush=True)
                     simulation(False, 20)
 
-                # Set mode to 'acquisition in order to enter the target zone and take pictures
+                # Set mode to acquisition in order to enter the target zone and take pictures
                 set_mode("acquisition", vel_data["vx"], vel_data["vy"], desired_angle)
                 wait("acquisition")
 
@@ -616,13 +416,15 @@ def objective_check_routine(image_queue): # def objective_check_routine(image_qu
                 if DEBUG:
                     simulation(False, 1)
 
+
+                # Check repetedly whether the destination has been reached
                 while True:
                     protect_battery(3, desired_angle)
                     check = get_observation()
                     safe()
 
                     if DEBUG:
-                        print(f"[CO-PILOT OF OBJECTIVE] Checking if in the desired zone.\nNow in {(check['width_x'], check['height_y'])}", flush=True)
+                        print(f"[OBJECTIVES] Checking if in the desired zone.\nNow in {(check['width_x'], check['height_y'])}", flush=True)
                   
                     if ((current_obj["zone"][2] >= check["width_x"] >= current_obj["zone"][0] and current_obj["zone"][3] >= check["height_y"] >= current_obj["zone"][1])):
                         break
@@ -638,15 +440,14 @@ def objective_check_routine(image_queue): # def objective_check_routine(image_qu
                 while True:
                     check = get_observation()
                     if (check["width_x"] >= current_obj["zone"][0] and check["height_y"] >= current_obj["zone"][1]):
-                        protect_battery(4.9, desired_angle) # Check battery levels
+                        protect_battery(4.9, desired_angle)
                         safe()
 
                         if (check["width_x"] <= current_obj["zone"][2] and check["height_y"] <= current_obj["zone"][3]):
                             if DEBUG:
-                                print(f"[CO-PILOT OF OBJECTIVE]I am inside the zone targeted and in simulation x1 only", flush=True)
+                                print(f"[OBJECTIVES]I am inside the zone targeted and in simulation x1 only", flush=True)
                             
                             
-                            # name = take_photo()
                             name = take_and_enqueue_photo(image_queue)
                             parts = name.split('_')
                             x = int(parts[1])
@@ -663,9 +464,6 @@ def objective_check_routine(image_queue): # def objective_check_routine(image_qu
                         else:
                             already_taken_photo = True
                             break
-            if DEBUG:
-                print("[CO-PILOT OF OBJECTIVE] I left the zone... i need to repeat once again")   
-            break # This might be needed here in order to return to the upper while loop when the zoned objective is done  
         
     except Exception as e:
         if DEBUG:
@@ -678,20 +476,30 @@ def objective_check_routine(image_queue): # def objective_check_routine(image_qu
 
 
 
-# ------------------------------------- PROCESS TO HANDLE IMAGES ---------------------------------
-# CANVAS_WIDTH, CANVAS_HEIGHT = 21600, 10800
+# ------------------------------------ AUTOMATIC IMAGE STITCHING ---------------------------------
 
 canvas = None
 
 def get_canvas_bytes(canvas, format='.png', quality=90):
-    """Convert the entire stitched canvas to bytes."""
+    """
+    Convert the entire stitched canvas to bytes.
+    
+    :param canvas: the canvas on which the image are being stitched
+    :param format: format of the canvas
+    :param quality: quality of encoding
+    """
     success, buffer = cv2.imencode(format, canvas, [cv2.IMWRITE_JPEG_QUALITY, quality])
     if success:
         return buffer.tobytes()
     return None
 
-# def stitch_image(image_data, name):
 def stitch_image(name):
+    """
+    Stitch an image onto the global canvas.
+    
+    :param name: The name of the image in the following format: lens{precision}_{x}_{y}.jpg 
+    """
+
     global canvas
     lens = 0
     def get_coords(filename):
@@ -710,14 +518,10 @@ def stitch_image(name):
         return x, y
 
     canvas_x, canvas_y = get_coords(name)
-    # img = Image.open(BytesIO(image_data)).resize((lens, lens))
 
-    # Lap ------------------------
-    # img = cv2.imdecode(np.frombuffer(image_data, np.uint8), cv2.IMREAD_COLOR)
     img = cv2.imread(name)
     img = cv2.resize(img, (lens, lens))
 
-    # Get image dimensions
     h, w = img.shape[:2]
 
     # Make sure the position is valid on our canvas
@@ -743,28 +547,26 @@ def stitch_image(name):
         canvas[valid_canvas_y:valid_canvas_y+valid_h, valid_canvas_x:valid_canvas_x+valid_w] = valid_img
         
     else:
-        # Normal case - place the entire image
+        # Place the whole image
         canvas[canvas_y:canvas_y+h, canvas_x:canvas_x+w] = img
     
-    # ----------------------------
     # return canvas
 
 def stitch_worker(image_queue):
+    """
+    The function that will be run by the stitching subprocess.
+    
+    :param image_queue: the queue that contains the images waiting to be stitched 
+    """
     global canvas
     canvas = np.zeros((10800, 21600, 3), dtype=np.uint8)
-    # TODO check pause_event to put it to sleep!!
 
     try:
         # Continuously listens for images and stitches them onto the canvas.
         while True:
             if DEBUG:
-                print("[IMAGES] ================> Waiting for image in queue... <================")
-            # image, name = image_queue.get()  # Wait for an image
+                print("[IMAGES] Waiting for image in queue...")
             name = image_queue.get()  # Wait for an image
-            # if image is None:
-            #     break
-            # canvas = stitch_image(image, name)  # Stitch image onto canvas
-            # stitch_image(image, name)  # Stitch image onto canvas
             stitch_image(name)  # Stitch image onto canvas
             
             stitched_map_bytes = get_canvas_bytes(canvas)
@@ -772,7 +574,7 @@ def stitch_worker(image_queue):
                 f.write(stitched_map_bytes)
 
             if DEBUG:
-                print("[IMAGES] ================> Image stitched and canvas updated. <================")
+                print("[IMAGES] Image stitched and canvas updated.")
     
     except Exception as e:
         if DEBUG:
@@ -781,20 +583,19 @@ def stitch_worker(image_queue):
     
         
 def start_stitching_process():
+    """
+    Starts the stitching process.
+    """
     image_queue = multiprocessing.Queue()
     process = multiprocessing.Process(target=stitch_worker, args=(image_queue,), daemon=True)
     process.start()
     return image_queue
 
-    
-    # IF WE WANT IT TO END (unlikely):
-    # image_queue.put(None)
-    # process.join()
+
 
 def take_and_enqueue_photo(queue):
     filename = take_photo()
-    if queue.qsize() < 30:
-        # queue.put((image_data, filename))
+    if queue.qsize() < 40: # threshold to not overload memory
         queue.put(filename)
         if DEBUG:
             print(f"[IMAGES] Image {filename} taken and enqueued. Queue size now {queue.qsize()}")
@@ -803,8 +604,13 @@ def take_and_enqueue_photo(queue):
     return filename
 
 
-# For zoned objectives (not the map)
-def stitch_and_submit_obj(image_files=[], objective={}): # lap code here
+def stitch_and_submit_obj(image_files=[], objective={}):
+    """
+    Stitches and submits known location objectives.
+
+    :param images_files: a list containing all the names of the image files taken in the function "objective_check_routine"
+    :objective: a dictionary containing all the information about the objective that we want to submit 
+    """
     try:
         if DEBUG:
             print(f"[STITCH OBJ] Image files received: {image_files}")
@@ -828,13 +634,7 @@ def stitch_and_submit_obj(image_files=[], objective={}): # lap code here
 
 
 
-# --------------------------------- THREAD FOR DETECTING EB -------------------------------
-
-
-started_beacon_objectives = []
-started_zoned_objectives = []
-sorted_beacon_objectives = []
-sorted_zoned_objectives = []
+# -------------------------------------- EB DETECTION THREAD -------------------------------------
 
 ALLOWED_DELTA = 75
 
@@ -842,45 +642,46 @@ NOISE_RANGE = [-1, 1]
 
 ANNOUNCEMENTS_URL = f"{MELVIN_BASE_URL}/announcements"
 
-PING_THRESHOLD = 8 # Number of pings to make the estimation of EB position (calling the find_solution())
+PING_THRESHOLD = 8 # Number of pings to make the estimation of EB position (calling find_solution())
 
 PING_LOG_FILE_PATH = "ping_log.txt"
 
 beacon_active = threading.Event()
 announcement_stream = None
 
-#############################################################################################################################
-# initialize all ping_num[...] to 0
-from collections import defaultdict
 ping_num = defaultdict(int)  # default value for all keys is 0
 
 
-#############################################################################################################################
 beacon_id = None
 id = None
 past_ids = set()
-d_noisy = {} # <------ is this needed???
-pings = {} # Store pings (Melvin's positions and measured distances)  <------ is this needed???
+d_noisy = {}
+pings = {}
 headers = {"Accept": "text/event-stream"}
 
 def start_announcement_thread():
+    """
+    Starts the thread that contiunuously listens to announcements
+    """
     announcement_thread = threading.Thread(target=listen_to_announcements, daemon=True)
-    # Creates a new thread → threading.Thread(target=listen_to_announcements, daemon=True)
-    # This tells Python: "Run the function listen_to_announcements, but do it in a separate worker
-    # (thread) instead of the main program."
     announcement_thread.start()
 
 def estimated_beacon_position(dnoisy):
+    """
+    Estimates the beacon's position by trying to guess the random number k
+    """
     k = random.uniform(NOISE_RANGE[0], NOISE_RANGE[1])
     d_actual = round(dnoisy - k * (3 * ALLOWED_DELTA + 0.4 * (dnoisy + 1)) / 4)
     return d_actual
 
 def listen_to_announcements():
-    """ ------------------- Continuously listen to /announcements in a separate thread. ---------------------- """
+    """
+    Continuously listens to /announcements. It detects messages associated with beacons and updates the global flag accordingly.
+    """
     global announcement_stream
     global ping_num, d_noisy
     global beacon_id
-    global id # The one we currently working on
+    global id # The id we currently working on
 
     try:
         if DEBUG:
@@ -909,7 +710,7 @@ def listen_to_announcements():
                 if DEBUG:
                     simulation(False, 1)
 
-                crucial_check = get_observation() # Only if EB found
+                crucial_check = get_observation()
                 
                 if DEBUG:
                     simulation(False, 20)
@@ -927,7 +728,7 @@ def listen_to_announcements():
                         id = int(parts[-1])
                         past_ids.add(id)
                         pings[id] = 0
-                        beacon_active.set() # Activate beacon flag
+                        beacon_active.set()
 
                         if DEBUG:
                             print(f"[DEBUG] GOT STARTING MESSAGE FOR EB, ID: {id}")
@@ -955,12 +756,10 @@ def listen_to_announcements():
                                 print("y_ping_melvin")
                                 print(crucial_check['height_y'])
 
-                            # Stores all necessary EB information
+                            # Stores all necessary EB information in a file
                             store_ping(crucial_check['width_x'], crucial_check['height_y'], estimated_beacon_position(d_noisy[ping_num[id]]), beacon_id)
                             ping_num[id] += 1 # Increase the number of pings that we have taken
                         
-                        # else: # This needs improvements ... ...............................................
-                        #     store_ping(crucial_check['width_x'], crucial_check['height_y'], estimated_beacon_position(d_noisy[ping_num]), beacon_id) # Other EBs can be present in the ping_log.txt (handle Lap) 
                     
                     elif DEBUG:
                         simulation(False, 20)
@@ -971,12 +770,14 @@ def listen_to_announcements():
         raise
 
 def store_ping(melvin_x, melvin_y, actual_distance, beacon_identifier):
-    """Store Melvin's location and received distance from beacon, avoiding duplicates."""
+    """
+    Stores MELVIN's location and received distance from beacon, avoiding duplicates.
+    """
     global pings  # Ensure we modify the global dictionary
 
     # If beacon_id is not in the dictionary, initialize a new list
     if beacon_identifier not in pings:
-        pings[beacon_identifier] = [] # dict num: list
+        pings[beacon_identifier] = []
 
     if not os.path.exists(PING_LOG_FILE_PATH):
         try:
@@ -988,15 +789,16 @@ def store_ping(melvin_x, melvin_y, actual_distance, beacon_identifier):
             if DEBUG:
                 print("[ERROR] Permission denied! Unable to create log file in root directory.")
             raise
-            return None
-
     with open(PING_LOG_FILE_PATH, "a") as file:
         file.write(
             f"[SUCCESS] PING for Beacon with ID: {beacon_identifier} found at {melvin_x} , {melvin_y}, with actual distance: {actual_distance} - Timestamp: {datetime.now()}\n")
 
 
-def handle_beacon_detection(image_queue, trials):
-    """ Wait till ping_threshold is achieved in order to run the estimation program """
+def handle_beacon_detection(image_queue):
+    """
+    Looks for pings untill PING_THRESHOLD is achieved in order to estimate the location. Between waiting for groups of pings, efficiently changes MELVIN
+    into acquisition mode, to take pictures for the Daily Map. MELVIN goes into charge mode when needed and wakes up in order to take pictures or receive more pings, depending on its position.
+    """
     global ping_num 
     global id
     global Map
@@ -1034,8 +836,9 @@ def handle_beacon_detection(image_queue, trials):
             if check['state'] != 'communication':
                 set_mode('communication', check['vx'], check['vy'], check['angle'])
                 wait('communication')
-            if ping_num[id] > 0:# or trials > 0:
+            if ping_num[id] > 0:
                 seconds_to_wait = 60
+                # Wait 60 seconds to see if we are outside the EB's range
                 if DEBUG:
                     print("[BEACON] Entering 60-sec waiting loop/")
                     seconds_to_wait = round(seconds_to_wait / 20)
@@ -1054,11 +857,13 @@ def handle_beacon_detection(image_queue, trials):
                         print("[BEACON] I escaped the circle")
                         print("[BEACON] Setting co-pilot")
 
+
+                    # The Daily Map capturing logic starts here (similar to function part4_main())
+
                     while True:
                         battery_order = 6
                         sleep_order = 1
                         battery_loss_acquisition = 0.15
-                        step = 400
                         battery_smart_trick = 4
                         
                         if DEBUG:
@@ -1077,7 +882,7 @@ def handle_beacon_detection(image_queue, trials):
                                 print(f"[BEACON CO-PILOT] Brutally falling to sleep for due to beacon priotity!My destination is {tar_x} , {tar_y}!!!")
                             
                             if current["state"] == "charge":
-                                total_time -= 180 # if already in charge mode
+                                total_time -= 180
                             
                             
                             set_mode("charge",check["vx"],check["vy"],check["angle"])
@@ -1125,7 +930,6 @@ def handle_beacon_detection(image_queue, trials):
                             
                             
                             time_calculated = calculate_travel_time(current["width_x"],current["height_y"],current["vx"],current["vy"],save[0],save[1],21600,10800,10) 
-                            hold_fast = False
                             current = get_observation()
                             if current["state"] == "charge":
                                 time_calculated -= 180 
@@ -1229,18 +1033,11 @@ def handle_beacon_detection(image_queue, trials):
                                     set_mode("acquisition", current["vx"], current["vy"], current["angle"])
                                     wait("acquisition")
                                     
-                                
-                                
-                            
-                        
-                                
-                            
                             
                             if DEBUG:
                                 print("[BEACON CO-PILOT] I obliged to the decision order! Now I will start the scan and take pictures")
 
                             
-                            #####
                             if DEBUG:
                                 simulation(False,4)
                             defender = False
@@ -1261,7 +1058,6 @@ def handle_beacon_detection(image_queue, trials):
                                         cont = True
                                         break
                                 
-                                #protect_battery(battery_order)
                                 current = get_observation()
                                 defender = False
                                 break_com = False
@@ -1291,7 +1087,6 @@ def handle_beacon_detection(image_queue, trials):
                                 if DEBUG:    
                                     print("[BEACON CO-PILOT] Travelling above area already photographed...refusing to take photo for now!")  
                                         
-                                    #protect_battery(battery_order)
                                     time.sleep(sleep_order)
                                     defender = True
                                     
@@ -1324,11 +1119,9 @@ def handle_beacon_detection(image_queue, trials):
 
 
             if ping_num[id] >= PING_THRESHOLD: # If the desired number of pings appears, then call the find_solution()
-                # RE-think about that, it costs time for the transition ...
-                # set_mode('charge', check['vx'], check['vy'], check['angle'])
-                # wait('charge')
-
-                width, height = find_solution() # Function that computes GL and returns the EB's position estimation 
+                set_mode('charge', check['vx'], check['vy'], check['angle'])
+                wait('charge') # Wait to get to charge mode first
+                width, height = find_solution() # Function that estimates the Beacon's location based on gemoetric loci
                 if DEBUG:
                     print("============================= BEACON LOCATION FOUND ==========================")
             
@@ -1364,22 +1157,21 @@ def handle_beacon_detection(image_queue, trials):
             raise
 
 def beacon_check_routine(image_queue):
-    # return False # DO NOT FORGET TO REMOVE THIS !!!!!!!!!!!!!!!!!!!!!!!!!
-    
+    """
+    Checks whether a beacon objective is available and handles it by calling handle_beacon_detection. 
+
+    :param image_queue: the image queue for the automatic stitching
+    """    
     if not beacon_active.is_set():
         return False
 
     if DEBUG:
         print("[BEACON] First beacon message found. Starting routine...")
     global ping_num
-    # global EB_submission_failed
-    # global trials
 
     trials = 0
-    # VVVV μαλλον δεν χρειαζεται? VVVV
-    # EB_σubmission_failed = True
 
-    while trials < 3:# and EB_submission_failed:
+    while trials < 3: # Try to submit 3 times
         check = get_observation()
         vx, vy, angle = check['vx'], check['vy'], check['angle']
         set_mode('communication', vx, vy, angle) # Need to change to communication mode immediately
@@ -1404,16 +1196,13 @@ def beacon_check_routine(image_queue):
         pattern = r"{\"status\": \"The beacon was found!\", \"attempts_made\": (\d+)}"
         match = re.search(pattern, result)
         
-        if match:
+        if match: # Case of success - return to main function
             beacon_active.clear() # Remember to set this to False in order to look for new EBs
-            # EB_submission_failed = False # We indeed successfully submitted
-            # trials = 0 # May not be necessary here
-            # ping_num[id] = 0 # Remember to change this for the upcoming EBs
-            with open("SUCCESSES.txt", "a") as file: # If it doesn't exist, then creates it
+            with open("SUCCESSES.txt", "a") as file:
                 file.write(f"Beacon with id {id}\nSUCCESS\n")
             return True
 
-        else: # In case of failure
+        else: # Case of failure
             pattern1 = r"{\"status\": \"The beacon could not be found around the given location\", \"attempts_made\": (\d+)}"
             match1 = re.search(pattern1, result)
             if match1 or fake_fail: # Did not found EB location correctly
@@ -1447,36 +1236,32 @@ def beacon_check_routine(image_queue):
                     protect_battery(5, check["angle"], "communication")
                     
                 if not fake_fail:
-                    trials += 1 # Already done one trial and did not succeded
-                ping_num[id] = 0 # Instead of just wait for extra 8 pings, we can try Petran's approach but we need his code implementation
+                    trials += 1 # Tried and failed
+                ping_num[id] = 0 
 
                 if DEBUG:
                     simulation(False,20)
                 
                 
-    if trials == 3: # Not the right flag, need adjustments if we want to use it
+    if trials == 3:
         if DEBUG:
             print('Found Error')
         with open("FAILURES.txt", "a") as file:
             file.write(f"\nBeacon with id {id} failed to be submitted.\n")
 
-    # if os.path.exists(PING_LOG_FILE_PATH):
-    #     if DEBUG:
-    #         print("[BEACON_ROUTINE] Removing ping log file.")
-    #     os.remove(PING_LOG_FILE_PATH)
 
     if os.path.exists(PING_LOG_FILE_PATH):
         if DEBUG:
             print("[BEACON_ROUTINE] Archiving ping log data.")
 
-        # Open source (read mode) and destination (append mode) in text mode
+        # Write the logs to the file
+
         with open(PING_LOG_FILE_PATH, 'r', encoding="utf-8") as src, open('ping_log_archive.txt', 'a', encoding="utf-8") as dst:
             for line in src:
-                dst.write(line)  # Append each line to the archive
+                dst.write(line)  
 
-        # Clear the original file (truncate instead of reopening)
         with open(PING_LOG_FILE_PATH, 'w', encoding="utf-8"):
-            pass  # Just truncate the file
+            pass  
 
     beacon_active.clear()
     if DEBUG:
@@ -1491,11 +1276,19 @@ def beacon_check_routine(image_queue):
 
 
 
-# -------------------------------- CREATION OF MAP MATRIX ---------------------------------
-
-#Do not touch if u dont have a clue
+# ----------------- CREATION OF BIT MATRIX - A REPRESENTATION OF THE MAP ------------------
 class BitMatrix:
+    '''
+    A space-efficient binary matrix using a bit array, optimized for fast operations.
+    '''
     def __init__(self, width=21600, height=10800):
+        """
+        Initializes a binary matrix with given width and height.
+        
+        :param width: Number of columns in the matrix.
+        :param height: Number of rows in the matrix.
+        :initial: The initialization value of the matrix.
+        """
         self.width = width
         self.height = height
         self.data = bitarray(width * height)
@@ -1503,21 +1296,53 @@ class BitMatrix:
         self.points_taken = 0
 
     def _check_bounds(self, x, y):
+        """
+        Ensures that given coordinates (x, y) are within valid matrix bounds.
+        
+        :raises IndexError: If (x, y) is out of bounds.
+        """
         if not (0 <= x < self.width and 0 <= y < self.height):
             raise IndexError(f"[ERROR] Coordinates ({x}, {y}) out of bounds")
 
-    def _index(self, x, y):  # Convert 2D coordinates to 1D index.
+    def _index(self, x, y):
+        """
+        Converts 2D coordinates (x, y) to a 1D index for the bit array.
+        
+        :return: Integer index corresponding to (x, y).
+        """
         return y * self.width + x
 
     def set_bit(self, x, y, value):
+        """
+        Sets a bit at position (x, y) to 0 or 1.
+        
+        :param x: X-coordinate.
+        :param y: Y-coordinate.
+        :param value: Boolean value (0 or 1) to set.
+        """
         self._check_bounds(x, y)
         self.data[self._index(x, y)] = bool(value)
 
     def get_bit(self, x, y):
+        """
+        Retrieves the bit value at position (x, y).
+        
+        :param x: X-coordinate.
+        :param y: Y-coordinate.
+        :return: Boolean value of the bit at (x, y).
+        """
         self._check_bounds(x, y)
         return self.data[self._index(x, y)]
 
     def update_map(self, x, y, angle, value):
+        """
+        Updates a square region around (x, y) based on camera angle.
+        
+        :param x: X-coordinate of center.
+        :param y: Y-coordinate of center.
+        :param angle: Camera angle ('wide', 'normal', or 'narrow') defining update range.
+        :param value: Boolean value (0 or 1) to set.
+        """
         lens_to_range = {'wide': 500, 'normal': 400, 'narrow': 300}
         range_val = lens_to_range[angle]
 
@@ -1549,7 +1374,8 @@ class BitMatrix:
     def print_matrix(self, step=500):
         """
         Print a compact representation of the matrix, using step sampling.
-        Displays the matrix in a more terminal-friendly format.
+
+        :param step: Sampling step size for visualization.
         """
         if DEBUG:
             print()
@@ -1581,6 +1407,12 @@ class BitMatrix:
                 print()
 
     def save_to_file(self, filename, compress=False):
+        """
+        Saves the matrix to a binary file for storage.
+        
+        :param filename: File path to save the data.
+        :param compress: If True, compresses data before saving.
+        """
         header = struct.pack('<IIQ?', self.width, self.height, self.points_taken, compress)
 
         # Prepare data
@@ -1594,6 +1426,12 @@ class BitMatrix:
 
     @classmethod
     def load_from_file(cls, filename):
+        """
+        Loads a BitMatrix object from a previously saved file.
+        
+        :param filename: File path to load the data from.
+        :return: A BitMatrix instance with restored data.
+        """
         with open(filename, 'rb') as f:
             header = f.read(struct.calcsize('<IIQ?'))
             width, height, points_taken, compress = struct.unpack('<IIQ?', header)
@@ -1611,7 +1449,7 @@ class BitMatrix:
 
 
 Map = BitMatrix(width=21600, height=10800)
-# Map = BitMatrix.load_from_file("backup_map.bmap")
+# Map = BitMatrix.load_from_file("backup_map.bmap") # In case we need to load a backup
 
 # -----------------------------------------------------------------------------------------
 
