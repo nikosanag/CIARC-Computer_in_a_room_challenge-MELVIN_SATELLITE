@@ -4,4 +4,3 @@ pillow
 bitarray
 psutil
 requests
-...
