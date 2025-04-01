@@ -10,7 +10,7 @@ In this challenge of esa we were called to create an autonomous system that mana
 
 ## Installation
 ### Prerequisites
--Python = 3.11.2
+- Python = 3.11.2
 
 ### Setup
 1. **Clone the repository:**
