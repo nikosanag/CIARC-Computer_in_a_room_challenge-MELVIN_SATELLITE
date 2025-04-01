@@ -50,7 +50,7 @@ def handler_exception(exc_type, exc_value, exc_traceback):
     '''
 
     global Map
-    safe("charge")
+    safe()
 
 
     """Log exceptions with detailed diagnostics."""
