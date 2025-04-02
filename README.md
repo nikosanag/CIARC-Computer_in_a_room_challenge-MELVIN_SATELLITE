@@ -42,7 +42,7 @@ e.g. vel_calculation.py implemented in order to find the optimal trajectory
 
 
 ## User Console
-Here we have to write whatever is necessary for someone to run our console.....
+See the README.md into the "operator console" folder
 
 
 ## Useful API Commands

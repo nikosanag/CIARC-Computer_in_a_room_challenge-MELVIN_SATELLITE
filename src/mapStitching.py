@@ -2,7 +2,6 @@ import cv2 as cv
 import numpy as np
 import requests
 import time
-import os
 from utility import get_observation, set_mode, wait, simulation, protect_battery, safe, take_photo
 
 MELVIN_BASE_URL = "http://10.100.10.14:33000"
