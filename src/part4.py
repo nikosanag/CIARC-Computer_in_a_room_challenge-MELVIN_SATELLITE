@@ -50,7 +50,7 @@ def handler_exception(exc_type, exc_value, exc_traceback):
     '''
 
     global Map
-    safe("charge")
+    safe()
 
 
     """Log exceptions with detailed diagnostics."""
@@ -177,10 +177,10 @@ def objective_check_routine(image_queue):
             print("[OBJECTIVES] Did not find the flag set!")
         return False
 
-    
+    """
+    Main implementation behind zoned objectives handler.
+    """
     try:
-
-
         global Map
 
         while objective_available.is_set():
@@ -189,14 +189,16 @@ def objective_check_routine(image_queue):
             desired_angle = current_obj["optic_required"]
             objective_image_list = []
 
-            # Be sure to keep MELVIN alive
+            # --------- Be sure to keep MELVIN alive ----------
             safe() 
             check = get_observation()
             time.sleep(1)
             protect_battery(5, desired_angle, check["state"])
+            # -------------------------------------------------
 
 
-            # Start handling known location objectives
+            # ------------------------------ From here we consider handling zoned objectives -----------------------------------
+            
             
             now = datetime.now(timezone.utc) - timedelta(minutes=15) 
             date_str = now.strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -205,7 +207,7 @@ def objective_check_routine(image_queue):
             if now >= limit:
                 if DEBUG:
                     print("[OBJECTIVE FAILED] DID NOT HAVE TIME FOR OBJECTIVE")
-                with open("FAILURES.txt", "a") as file:
+                with open("FAILURES.txt", "a") as file: # If it doesn't exist, then creates it
                     file.write(f"Objective:\n{current_obj}\nFailed: Ending time had expired when we found it!.\n")
                 if objective_queue.empty():
                     objective_available.clear()
@@ -225,14 +227,35 @@ def objective_check_routine(image_queue):
             des_y = current_obj["zone"][3]
             already_taken_photo = False
 
+            # precise_picture = False # Flag in order to check if precise picture objective is given
+            xIsMax = False
+            yIsMax = False
+
+            axis_x = current_obj["zone"][2] - current_obj["zone"][0]
+            axis_y = current_obj["zone"][3] - current_obj["zone"][1]
 
             while True:
                 
                 safe()
+                protect_battery(4, desired_angle)
 
                 check = get_observation()
                 
+                # If already taken photo we should update the target point and check whether the objective in done
                 if already_taken_photo:
+                    # if precise_picture:
+                    #     if DEBUG:
+                    #         print("[OBJECTIVES] ==================== PRECISE OBJECTIVE DONE! =====================", flush=True)
+                            
+                    #         charge_check = get_observation()
+                    #         if charge_check["battery"] < 5:
+                    #             set_mode("charge", check["vx"], check["vy"], desired_angle)
+                    #             wait("charge")
+
+                    #         stitch_and_submit_obj(objective_image_list, current_obj)
+                    #         if objective_queue.empty():
+                    #             objective_available.clear()
+                    #         return True
                     
                     if desired_angle == "wide":
                         offset = 500
@@ -241,14 +264,34 @@ def objective_check_routine(image_queue):
                     else:
                         offset = 300
 
-                    if des_y - offset >= current_obj["zone"][1]:
-                        des_x = des_x
-                        des_y = des_y - 3*(offset // 2)
-                    else:
-                        des_x = des_x + 3*(offset // 2)
-                        des_y = des_y
+                    if not xIsMax and not yIsMax:
+                        if des_y - offset >= current_obj["zone"][1]:
+                            des_x = des_x
+                            des_y = des_y - 3*(offset // 2)
+                        else:
+                            des_x = des_x + 3*(offset // 2)
+                            des_y = des_y
 
-                        if des_x > current_obj["zone"][2]: 
+                            if des_x >= current_obj["zone"][2]: # + offset / 2:
+                                if DEBUG:
+                                    print("[OBJECTIVES] ==================== OBJECTIVE DONE! =====================", flush=True)
+                                charge_check = get_observation()
+                                if charge_check["battery"] < 5:
+                                    set_mode("charge", check["vx"], check["vy"], desired_angle)
+                                    wait("charge")
+
+                                stitch_and_submit_obj(objective_image_list, current_obj)
+                                with open("SUCCESSES.txt", "a") as file: # If it doesn't exist, then creates it
+                                    file.write(f"Objective:\n{current_obj}\nSUCCESS\n")
+                                if objective_queue.empty():
+                                    objective_available.clear()
+                                return True
+                                # END OF ZONED OBJECTIVE SUBMISSION
+
+                    elif xIsMax:
+                        des_x = des_x + min(axis_x // 2, offset)
+
+                        if des_x >= current_obj["zone"][2]: # + offset / 2:
                             if DEBUG:
                                 print("[OBJECTIVES] ==================== OBJECTIVE DONE! =====================", flush=True)
                             charge_check = get_observation()
@@ -256,13 +299,36 @@ def objective_check_routine(image_queue):
                                 set_mode("charge", check["vx"], check["vy"], desired_angle)
                                 wait("charge")
 
-                            # Objective submission
                             stitch_and_submit_obj(objective_image_list, current_obj)
-                            with open("SUCCESSES.txt", "a") as file: 
+                            with open("SUCCESSES.txt", "a") as file: # If it doesn't exist, then creates it
                                 file.write(f"Objective:\n{current_obj}\nSUCCESS\n")
                             if objective_queue.empty():
                                 objective_available.clear()
                             return True
+
+                    elif yIsMax:
+                        if des_y - min(axis_y // 2, offset) > current_obj["zone"][1]:
+                            des_y = des_y - min(axis_y // 2, offset)
+                            des_x = des_x
+                        else:
+                            des_y = current_obj["zone"][1]
+                            des_x = des_x + min(axis_x // 2, offset)
+
+                            if des_x >= current_obj["zone"][2]: # + offset / 2:
+                                if DEBUG:
+                                    print("[OBJECTIVES] ==================== OBJECTIVE DONE! =====================", flush=True)
+                                charge_check = get_observation()
+                                if charge_check["battery"] < 5:
+                                    set_mode("charge", check["vx"], check["vy"], desired_angle)
+                                    wait("charge")
+
+                                stitch_and_submit_obj(objective_image_list, current_obj)
+                                with open("SUCCESSES.txt", "a") as file: # If it doesn't exist, then creates it
+                                    file.write(f"Objective:\n{current_obj}\nSUCCESS\n")
+                                if objective_queue.empty():
+                                    objective_available.clear()
+                                return True
+                                # END OF ZONED OBJECTIVE SUBMISSION
 
                 else:
                     lens = desired_angle
@@ -272,24 +338,39 @@ def objective_check_routine(image_queue):
                         offset = 400
                     else:
                         offset = 300
-
-                    des_y = des_y - offset
+                    
+                    des_y = des_y - offset #/ 2 # REMEMBER TO MODIFY
                 
+                    # if (current_obj["zone"][2] - current_obj["zone"][0] == offset * 2) and (current_obj["zone"][3] - current_obj["zone"][1] == offset * 2):
+                    #     des_x = des_x + offset / 2 # Going directly to the center of the precise picture
+                    #     precise_picture = True
+                    #     if DEBUG:
+                    #         print("[OBJECTIVE] Precise picture objective")
+                    
+                    
+                    if (axis_x <= offset * 2) and (axis_y <= offset * 2): # Less than a photo needed
+                        if (axis_x >= axis_y):
+                            xIsMax = True
+                            des_y = current_obj["zone"][1] # Upper Corner
+                        else:
+                            yIsMax = True
+                            des_y = current_obj["zone"][3] - axis_y // 2 # A little bit upper from the downmost left corner
+
+
 
                 if DEBUG:
-                    print(f"[OBJECTIVES] New desired position: ({des_x},{des_y})", flush=True)
+                    print(f"[CO-PILOT OF OBJECTIVE] New desired position: ({des_x},{des_y})", flush=True)
 
                 while True:
                     if DEBUG:
                         simulation(False,1)
-                        print("[OBJECTIVES] getting the speed order...this is a blocking command")
+                        print("[CO-PILOT OF OBJECTIVE] getting the speed order...this is a blocking command")
                     check = get_observation()
                     cur_x = check["width_x"]
                     cur_y = check["height_y"]
                     cur_vx = check["vx"]
                     cur_vy = check["vy"]
 
-                    # Calculate the desired velocity in order to reach the target
                     vel_data = calculate_velocity(cur_x, cur_y, des_x, des_y, cur_vx, cur_vy)
                     current_velocity = get_observation()
 
@@ -299,34 +380,41 @@ def objective_check_routine(image_queue):
                     if ((current_velocity["vx"] == vel_data["vx"]) and (current_velocity["vy"] == vel_data["vy"])):
                         break
 
-                    # Set mode to 'acquisition' and begin orbiting towards the target point
+                    # Time passes, set mode to 'acquisition' and begin orbiting towards the target point
                     for _ in range(5):
                         protect_battery(6, desired_angle)
                         safe()
-                        set_mode("acquisition", vel_data["vx"], vel_data["vy"], desired_angle)
-                        # Apply the computed velocity repetedly, to make sure the final trajectory is valid 
+                        set_mode("acquisition", vel_data["vx"], vel_data["vy"], desired_angle) # Apply the computed velocity
                         wait("acquisition")
                         time.sleep(0.1)
                         if DEBUG:
-                            print(f"[DEBUG] SET {desired_angle} angle")
- 
+                            print(f"[CO-PILOT OF OBJECTIVE] SET {desired_angle} angle")
+                    
+                        #name = take_photo()
+                        # parts = name.split('_')
+                        # x = int(parts[1])
+                        # y = int(parts[2][:-4])
+
+                        if DEBUG:
+                            simulation(False, 1)
+                        #Map.update_map(x, y, desired_angle, 1)
+                        if DEBUG:
+                            simulation(False, 20)
                         
                 if DEBUG:
                     simulation(False,20)
                 while True:
                     if DEBUG:
-                        print("[OBJECTIVES] Checking if i am already too close.", flush=True)
+                        print("[CO-PILOT OF OBJECTIVE] Checking if i am already too close.", flush=True)
                     
-                    # Find out whether MELVIN reaches the destination in time
                     can_reach = time_computation(vel_data['distance'])
                     check = get_observation()
-                    # Calculate tht ime needed in order to reach the destination
                     can_reach_time = calculate_travel_time(check['width_x'], check['height_y'], check['vx'], check['vy'], des_x, des_y)
                     if DEBUG:
-                        print(f"[OBJECTIVES] The time we computed in order to reach desired destination: {round(can_reach[1], 1)}", flush=True)
-                        print(f"[OBJECTIVES] Is reachable? {can_reach[0]}", flush=True)
+                        print(f"[CO-PILOT OF OBJECTIVE] The time we computed in order to reach desired destination: {round(can_reach[1], 1)}", flush=True)
+                        print(f"[CO-PILOT OF OBJECTIVE] Is reachable? {can_reach[0]}", flush=True)
 
-                    if can_reach[0]: # MELVIN will eventually find the target point
+                    if can_reach[0]: # It can and it will find the target point
                       
                         # Check if MELVIN is very close to the target spot
                         if round(can_reach_time, 1) < 360:
@@ -338,8 +426,8 @@ def objective_check_routine(image_queue):
                             if DEBUG:
                                 simulation(False, 1)
 
-                            check = get_observation()
-                            cur_x = check["width_x"]  
+                            check = get_observation() # I think this should added here ...
+                            cur_x = check["width_x"]   # giati toso palio check ???
                             cur_y = check["height_y"]
                             cur_vx = check['vx']
                             cur_vy = check['vy']
@@ -347,14 +435,14 @@ def objective_check_routine(image_queue):
                             des_x = current_obj["zone"][0]
                             des_y = current_obj["zone"][3] - offset
                             
-                       
+                        # Just to be sure we are heading with the optimal speed
                         if DEBUG:
                             simulation(False,20)
                         mine = get_observation()
                         set_mode("charge", mine["vx"], mine["vy"], desired_angle)
                         wait("charge")
                         if DEBUG:
-                            print(f"[DEBUG] SET {desired_angle} angle")
+                            print(f"[CO-PILOT OF OBJECTIVE] SET {desired_angle} angle")
                         if DEBUG:
                             simulation(False,1)
                         
@@ -364,17 +452,15 @@ def objective_check_routine(image_queue):
 
                         threshold = 20
                         time1 = float('inf')
-
-                        # Find the appropriate threshold to calculate the time needed to reach the target
                         while math.isinf(time1) and threshold <= 100:
                             time1 = calculate_travel_time(check["width_x"],check["height_y"],check["vx"],check["vy"],des_x,des_y,21600,10800,threshold)
                             threshold += 5
 
                         if DEBUG:
-                            print(f"[OBJECTIVES] Just got sleep order time estimate in REAL time: {round(time1, 1)} and i am in simulation 1", flush=True)
+                            print(f"[CO-PILOT OF OBJECTIVE] Just got sleep order time estimate in REAL time: {round(time1, 1)} and i am in simulation 1", flush=True)
                     
                         key = round(time1, 2)
-                        key = key - 180 - 60
+                        key = key - 180 - 60 # nikos anag - 60
 
                         if DEBUG:
                             key = round(key/20,2)
@@ -384,11 +470,10 @@ def objective_check_routine(image_queue):
                         if DEBUG:
                             simulation(False, 20)
 
-                        # Wait until MELVIN arrives to the desired position
                         safe_occured = False
                         while True:
                             if DEBUG:
-                                print(f"[OBJECTIVES] Sleeping and remaining time is {round(key - i,2)} seconds in x20 time", flush=True)
+                                print(f"[CO-PILOT OF OBJECTIVE] Sleeping and remaining time is {round(key - i,2)} seconds in x20 time", flush=True)
                             time.sleep(1)
                             state = get_observation()
                             if state["state"] == "safe":
@@ -396,19 +481,22 @@ def objective_check_routine(image_queue):
                                 safe_occured = True
                                 break
                             safe()
+                            protect_battery(5, desired_angle)
                             i += 1
                             if i >= key:
                                 break
                         break
                     
+                    #else we need to terminate this
+                
                 if safe_occured:
                     continue
 
                 if DEBUG:
-                    print("[OBJECTIVES] Getting ready to reach target", flush=True)
+                    print("[CO-PILOT OF OBJECTIVE] Getting ready to reach target", flush=True)
                     simulation(False, 20)
 
-                # Set mode to acquisition in order to enter the target zone and take pictures
+                # Set mode to 'acquisition in order to enter the target zone and take pictures
                 set_mode("acquisition", vel_data["vx"], vel_data["vy"], desired_angle)
                 wait("acquisition")
 
@@ -416,15 +504,13 @@ def objective_check_routine(image_queue):
                 if DEBUG:
                     simulation(False, 1)
 
-
-                # Check repetedly whether the destination has been reached
                 while True:
                     protect_battery(3, desired_angle)
                     check = get_observation()
                     safe()
 
                     if DEBUG:
-                        print(f"[OBJECTIVES] Checking if in the desired zone.\nNow in {(check['width_x'], check['height_y'])}", flush=True)
+                        print(f"[CO-PILOT OF OBJECTIVE] Checking if in the desired zone.\nNow in {(check['width_x'], check['height_y'])}", flush=True)
                   
                     if ((current_obj["zone"][2] >= check["width_x"] >= current_obj["zone"][0] and current_obj["zone"][3] >= check["height_y"] >= current_obj["zone"][1])):
                         break
@@ -440,14 +526,15 @@ def objective_check_routine(image_queue):
                 while True:
                     check = get_observation()
                     if (check["width_x"] >= current_obj["zone"][0] and check["height_y"] >= current_obj["zone"][1]):
-                        protect_battery(4.9, desired_angle)
+                        protect_battery(4.9, desired_angle) # Check battery levels
                         safe()
 
                         if (check["width_x"] <= current_obj["zone"][2] and check["height_y"] <= current_obj["zone"][3]):
                             if DEBUG:
-                                print(f"[OBJECTIVES]I am inside the zone targeted and in simulation x1 only", flush=True)
+                                print(f"[CO-PILOT OF OBJECTIVE]I am inside the zone targeted and in simulation x1 only", flush=True)
                             
                             
+                            # name = take_photo()
                             name = take_and_enqueue_photo(image_queue)
                             parts = name.split('_')
                             x = int(parts[1])
@@ -457,14 +544,14 @@ def objective_check_routine(image_queue):
 
                             
                             if DEBUG:
-                                print("Just took a photo", flush=True)
+                                print("[OBJECTIVE] Just took a photo", flush=True)
                             
                             time.sleep(1)
 
                         else:
                             already_taken_photo = True
                             break
-        
+
     except Exception as e:
         if DEBUG:
             print(f"[OBJECTIVES ERROR] An error occured: {str(e)}")
@@ -685,24 +772,24 @@ def listen_to_announcements():
 
     try:
         if DEBUG:
-            print("[INFO] Subscribing to /announcements (SSE) for real-time updates...")
+            print("[BEACON] Subscribing to /announcements (SSE) for real-time updates...")
 
         announcement_stream = requests.get(ANNOUNCEMENTS_URL, stream=True, headers=headers)
         announcement_stream.raise_for_status()
 
         if announcement_stream is None:
             if DEBUG:
-                print("[ERROR] Announcement stream is not initialized.")
+                print("[BEACON ERROR] Announcement stream is not initialized.")
             return
 
         if announcement_stream.status_code != 200:
             if DEBUG:
-                print(f"[ERROR] Status code {announcement_stream.status_code} from {ANNOUNCEMENTS_URL}")
-                print("[ERROR] Response text:", announcement_stream.text)
+                print(f"[BEACON ERROR] Status code {announcement_stream.status_code} from {ANNOUNCEMENTS_URL}")
+                print("[BEACON ERROR] Response text:", announcement_stream.text)
             return
 
         if DEBUG:
-            print(f"[DEBUG] Entering while loop inside func listen_to_announcements()")
+            print(f"[BEACON] Entering while loop inside func listen_to_announcements()")
 
         while True:
 
@@ -731,26 +818,26 @@ def listen_to_announcements():
                         beacon_active.set()
 
                         if DEBUG:
-                            print(f"[DEBUG] GOT STARTING MESSAGE FOR EB, ID: {id}")
+                            print(f"[BEACON] GOT STARTING MESSAGE FOR EB, ID: {id}")
                         
                     
                     check = get_observation()
                     if 'ping' in striped_line:
                         if DEBUG:
-                            print(f'MESSAGE WITH PING: {line}')
-                            print(f"MELVIN had x: {check['width_x']} and y: {check['height_y']}")
+                            print(f'[BEACON] MESSAGE WITH PING: {line}')
+                            print(f"[BEACON] MELVIN had x: {check['width_x']} and y: {check['height_y']}")
 
                     if "GALILEO_MSG_EB,ID" in line or "GALILEO_MSG_EB, ID" in line:
                         if DEBUG:
                             print(line)
-                            print("[DEBUG] It was Gallileoooo")
+                            print("[BEACON] It was Gallileoooo")
 
                         parts = line.split(",")
                         beacon_id = int(parts[1].split("_")[-1])
                         if beacon_id == id:
                             d_noisy[ping_num[id]] = float(parts[2].split("_")[-1])
                             if DEBUG:
-                                print(f"[INFO] Received ping for beacon {beacon_id} with noisy distance: {d_noisy[ping_num[id]]}")
+                                print(f"[BEACON] Received ping for beacon {beacon_id} with noisy distance: {d_noisy[ping_num[id]]}")
                                 print("x_ping_melvin")
                                 print(crucial_check['width_x'])
                                 print("y_ping_melvin")
@@ -766,7 +853,7 @@ def listen_to_announcements():
                         
     except requests.RequestException as e:
         if DEBUG:
-            print(f"[ERROR] Failed to track announcements: {str(e)}")
+            print(f"[BEACON ERROR] Failed to track announcements: {str(e)}")
         raise
 
 def store_ping(melvin_x, melvin_y, actual_distance, beacon_identifier):
@@ -784,14 +871,14 @@ def store_ping(melvin_x, melvin_y, actual_distance, beacon_identifier):
             with open(PING_LOG_FILE_PATH, "w") as file:
                 file.write("")
             if DEBUG:
-                print(f"[INFO] Created log file: {PING_LOG_FILE_PATH}")
+                print(f"[BEACON] Created log file: {PING_LOG_FILE_PATH}")
         except PermissionError:
             if DEBUG:
-                print("[ERROR] Permission denied! Unable to create log file in root directory.")
+                print("[BEACON ERROR] Permission denied! Unable to create log file in root directory.")
             raise
     with open(PING_LOG_FILE_PATH, "a") as file:
         file.write(
-            f"[SUCCESS] PING for Beacon with ID: {beacon_identifier} found at {melvin_x} , {melvin_y}, with actual distance: {actual_distance} - Timestamp: {datetime.now()}\n")
+            f"[BEACON SUCCESS] PING for Beacon with ID: {beacon_identifier} found at {melvin_x} , {melvin_y}, with actual distance: {actual_distance} - Timestamp: {datetime.now()}\n")
 
 
 def handle_beacon_detection(image_queue):
@@ -904,17 +991,10 @@ def handle_beacon_detection(image_queue):
                             break
                         else:
                         
-                        
-                            
-                        
-                            
-                            
                             current = get_observation()
 
                             if DEBUG:
                                 print("[BEACON CO-PILOT] Thinking about whether I go to sleep or not...!")
-                            
-                            
                             
                             l = get_trajectory()
                             save = (-1,-1)
@@ -927,14 +1007,11 @@ def handle_beacon_detection(image_queue):
                             if DEBUG:
                                 print(f"[BEACON CO-PILOT] My target is {save}")
                             
-                            
-                            
                             time_calculated = calculate_travel_time(current["width_x"],current["height_y"],current["vx"],current["vy"],save[0],save[1],21600,10800,10) 
                             current = get_observation()
                             if current["state"] == "charge":
                                 time_calculated -= 180 
-                                
-                                
+                                   
                                 
                             if time_calculated>=360 : 
                                 time_calculated -= 185
@@ -1152,7 +1229,7 @@ def handle_beacon_detection(image_queue):
 
         except Exception as e:
             if DEBUG:
-                print(f"[BEACON_ERROR]: {str(e)}")
+                print(f"[BEACON ERROR]: {str(e)}")
                 print(traceback.extract_tb(e.__traceback__))
             raise
 
@@ -1178,7 +1255,7 @@ def beacon_check_routine(image_queue):
         wait('communication')
 
         if DEBUG:
-            print(f"[BEACON_ROUTINE] Going to find solution number {trials + 1}")
+            print(f"[BEACON ROUTINE] Going to find solution number {trials + 1}")
         width, height = handle_beacon_detection(image_queue, trials) # Take the optimal solution estimation
 
         fake_fail = False
@@ -1214,7 +1291,7 @@ def beacon_check_routine(image_queue):
                 wait("acquisition")
                 if DEBUG:
                     simulation(False,1)
-                    print(f'[BEACON_ROUTINE] Trial {trials + 1} failed, retrying...')
+                    print(f'[BEACON ROUTINE] Trial {trials + 1} failed, retrying...')
                 check = get_observation()
                 vel_data = calculate_velocity(check['width_x'], check['height_y'], width, height, check['vx'], check['vy'])
                 if not fake_fail:
@@ -1224,13 +1301,13 @@ def beacon_check_routine(image_queue):
                     vx = check['vx']
                     vy = check['vy'] + 2
                 if DEBUG:
-                    print("[BEACON_ROUTINE] Waiting to reach desired velocity...")
+                    print("[BEACON ROUTINE] Waiting to reach desired velocity...")
                 while True:
                     set_mode('acquisition', vx, vy, check['angle']) # Change orbit
                     check = get_observation()
                     if check["vx"] == vx and check["vy"] == vy:
                         if DEBUG:
-                            print("[BEACON_ROUTINE] Reached desired velocity")
+                            print("[BEACON ROUTINE] Reached desired velocity")
                         break
                     safe("communication") 
                     protect_battery(5, check["angle"], "communication")
@@ -1245,14 +1322,14 @@ def beacon_check_routine(image_queue):
                 
     if trials == 3:
         if DEBUG:
-            print('Found Error')
+            print('[BEACON ERROR] Found Error')
         with open("FAILURES.txt", "a") as file:
             file.write(f"\nBeacon with id {id} failed to be submitted.\n")
 
 
     if os.path.exists(PING_LOG_FILE_PATH):
         if DEBUG:
-            print("[BEACON_ROUTINE] Archiving ping log data.")
+            print("[BEACON ROUTINE] Archiving ping log data.")
 
         # Write the logs to the file
 
@@ -1265,7 +1342,7 @@ def beacon_check_routine(image_queue):
 
     beacon_active.clear()
     if DEBUG:
-        print("[BEACON_ROUTINE] Trials ended")
+        print("[BEACON ROUTINE] Trials ended")
         
     return True
     
@@ -1664,7 +1741,7 @@ def part4_main():
         image_queue = start_stitching_process()
 
         if DEBUG:
-            print("[] Starting whole operation.")
+            print("[PART4 MAY BEGIN] Starting whole operation.")
             print("[MELVIN] LAW - when mini charge break happens anything else will become useless until the charge completes")
             simulation(False, 1) # Can change this to True
             
@@ -1920,20 +1997,14 @@ def part4_main():
                             print("[DAILY PILOT] Time-battery combination allows me to keep going")
                         set_mode("acquisition", current["vx"], current["vy"], current["angle"])
                         wait("acquisition")
-                        
-                    
-                    
+                           
                 if hold_fast:
                     continue
             
-                    
-                
-                
                 if DEBUG:
                     print("[DAILY PILOT] I obliged to the decision order! Now I will start the scan and take pictures")
                     simulation(False,20)
 
-                
                 #####
                 if DEBUG:
                     simulation(False,4)
