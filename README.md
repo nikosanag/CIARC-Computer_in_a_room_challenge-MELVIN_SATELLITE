@@ -18,11 +18,20 @@ In this challenge of esa we were called to create an autonomous system that mana
     git clone https://github.com/nikosanag/CIARC-Computer_in_a_room_challenge-MELVIN_SATELLITE.git
 
 2. **Create a virtual environment (optional but recommended):**
-    ```sh
+   *On Unix-based systems (Linux/macOS):*
+    ```bash
     python3 -m venv venv
     source venv/bin/activate
+   ```
+   *On Windows:*
+   ```bash
+   python -m venv venv
+   ```
+   ```cmd
+   venv\Scripts\activate
+   ```   
 
-3. **Install dependancies:**
+4. **Install dependancies:**
     ```sh
     pip3 install -r requirements.txt
 
