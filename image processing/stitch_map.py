@@ -63,9 +63,9 @@ def stitch_image(name):
 
 canvas = np.zeros((10800, 21600, 3), dtype=np.uint8)
 
-path = 'D:/Desktop/CIARC 2024/part1/eval_map_stitching/'
+path = # Fill with the path to the folder that contains the images
 
-output = 'D:/Desktop/CIARC 2024/part1/stitch_resutls/SAFE_MAP_5.png'
+output = # Fill with the path to be saved and the name of the map ending with .png (e.g. '/PathToSave/Map/map.png')
 
 images = [f for f in os.listdir(path) if os.path.isfile(path + f)]
 
