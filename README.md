@@ -15,7 +15,7 @@ In this challenge of esa we were called to create an autonomous system that mana
 ### Setup
 1. **Clone the repository:**
     ```sh 
-    git clone https://github.com/yourusername/yourproject.git myfolder 
+    git clone https://github.com/nikosanag/CIARC-Computer_in_a_room_challenge-MELVIN_SATELLITE.git myfolder 
 
 2. **Create a virtual environment (optional but recommended):**
     ```sh
