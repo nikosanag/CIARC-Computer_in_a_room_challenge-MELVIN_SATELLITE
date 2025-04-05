@@ -1,0 +1,23 @@
+# def calculate_travel_time(x, y, vx, vy, dest_x, dest_y, width=21600, height=10800, tolerance=5):
+#     """
+#     Calculates the time needed in seconds to reach (dest_x, dest_y) from (x, y) 
+#     considering velocities (vx, vy) and wrap-around world behavior.
+#     Allows a slight tolerance for error in reaching the destination point (x, y).
+#     """
+#     if vx == 0 and abs(x - dest_x) > tolerance:
+#         return float('inf')  # Impossible to reach destination in x-direction
+#     if vy == 0 and abs(y - dest_y) > tolerance:
+#         return float('inf')  # Impossible to reach destination in y-direction 
+    
+#     # Compute shortest distance considering wrap-around
+#     dx = min(abs(dest_x - x), width - abs(dest_x - x))
+#     dy = min(abs(dest_y - y), height - abs(dest_y - y))
+    
+#     # Compute time needed for each axis in seconds
+#     tx = dx / abs(vx) if vx != 0 else float('inf')
+#     ty = dy / abs(vy) if vy != 0 else float('inf')
+    
+#     if tx < 0 or ty < 0:
+#         return float('inf')  # If time is negative, destination is unreachable
+    
+#     return int(round(max(tx, ty))) if max(tx, ty) > tolerance else 0  # Allow slight error tolerance

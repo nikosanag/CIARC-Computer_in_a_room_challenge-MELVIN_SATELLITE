@@ -1577,6 +1577,14 @@ def get_trajectory(x = -1,y = -1,vx = -1,vy = -1):
     return trajectory
 
 def think_about_it(list):
+    """
+    Evaluates a list of coordinates to determine if at least one of them corresponds 
+    to a "good" condition based on the state of the global Map object.
+    
+    :param list: List of tuples representing coordinates (x, y) that is received from the get_trajectory function.
+    
+    
+    """
     global Map
     good = False
     # print(list) # debug
@@ -1588,6 +1596,13 @@ def think_about_it(list):
     return good
 
 def change_speed(x,y,battery_order):
+    """
+    function that changes speed on command
+    :param x: x coordinate of the target
+    :param y: y coordinate of the target
+    :param battery_order: battery order for the speed change...if battery gets below that the change speed operation will be interrupted with a full charge break session
+    """
+    
     
     set_mode("acquisition",x, y,"wide")
     wait("acquisition")
@@ -1616,35 +1631,16 @@ def change_speed(x,y,battery_order):
         if DEBUG:     
             simulation(False,1)
 
-# def calculate_travel_time(x, y, vx, vy, dest_x, dest_y, width=21600, height=10800, tolerance=5):
-#     """
-#     Calculates the time needed in seconds to reach (dest_x, dest_y) from (x, y) 
-#     considering velocities (vx, vy) and wrap-around world behavior.
-#     Allows a slight tolerance for error in reaching the destination point (x, y).
-#     """
-#     if vx == 0 and abs(x - dest_x) > tolerance:
-#         return float('inf')  # Impossible to reach destination in x-direction
-#     if vy == 0 and abs(y - dest_y) > tolerance:
-#         return float('inf')  # Impossible to reach destination in y-direction 
-    
-#     # Compute shortest distance considering wrap-around
-#     dx = min(abs(dest_x - x), width - abs(dest_x - x))
-#     dy = min(abs(dest_y - y), height - abs(dest_y - y))
-    
-#     # Compute time needed for each axis in seconds
-#     tx = dx / abs(vx) if vx != 0 else float('inf')
-#     ty = dy / abs(vy) if vy != 0 else float('inf')
-    
-#     if tx < 0 or ty < 0:
-#         return float('inf')  # If time is negative, destination is unreachable
-    
-#     return int(round(max(tx, ty))) if max(tx, ty) > tolerance else 0  # Allow slight error tolerance
+
 
 
 def mod_signed_diff(a, b, mod_val):
     """
     Returns the signed minimal difference between a and b on a circle of circumference mod_val.
     The result lies in [-mod_val/2, mod_val/2].
+    :param a: First value
+    :param b: Second value
+    :param mod_val: Modulus value (circumference of the circle)
     """
     diff = (a - b) % mod_val
     if diff > mod_val/2:
@@ -1667,6 +1663,15 @@ def calculate_travel_time(x, y, vx, vy, dest_x, dest_y, width=21600, height=1080
     coordinate “crosses” the destination (modulo the wrap) and the small time window 
     around that crossing when the coordinate is within tolerance. Then it looks for the 
     earliest time when both x and y are simultaneously within tolerance.
+    :param x: Current x-coordinate
+    :param y: Current y-coordinate
+    :param vx: Velocity in x-direction
+    :param vy: Velocity in y-direction
+    :param dest_x: Destination x-coordinate
+    :param dest_y: Destination y-coordinate
+    :param width: Width of the map (wrap-around)
+    :param height: Height of the map (wrap-around)
+    :param tolerance: Tolerance for reaching the destination
     """
     
     # Handle the non-moving axes.
@@ -1736,6 +1741,10 @@ def calculate_travel_time(x, y, vx, vy, dest_x, dest_y, width=21600, height=1080
 
 
 def part4_main():
+    """
+    start of the commander logic for the daily map and simultaneously checking and giving the authority of melvin to 
+    beacon handler and objective handler when the time comes.
+    """
     try:
         safe()
         image_queue = start_stitching_process()
