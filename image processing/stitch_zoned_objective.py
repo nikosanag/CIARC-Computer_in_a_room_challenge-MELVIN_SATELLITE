@@ -214,7 +214,7 @@ def stitch_zoned(top_left, bottom_right, specific_files, final_name):
     :param specific_files: the list of the desired image names to look for
     '''
     # Directory containing the images
-    image_dir = # Fill with the path that contains the images 
+    image_dir = "" # Fill with the path that contains the images 
     
     # Create the dynamic canvas
     canvas, stitched_images, origin = create_dynamic_canvas(top_left, bottom_right)
