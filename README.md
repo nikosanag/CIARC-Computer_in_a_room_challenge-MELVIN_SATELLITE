@@ -32,7 +32,7 @@ In this challenge of esa we were called to create an autonomous system that mana
 
 4. **Install dependancies:**
     ```sh
-    pip3 install -r requirements.txt
+    pip install -r requirements.txt
 
 
 ## Usage
