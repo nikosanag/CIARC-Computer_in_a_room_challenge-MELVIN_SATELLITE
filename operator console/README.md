@@ -22,4 +22,4 @@
 
 9. You can Select MELVIN's mode through the available option at the right part of the window. You can set it to communcation, acquisition or charge mode.
 
-10. To help the visualisation of MELVIN's position. the grid on the black plane consists of squares with dimensions 1000x1000 pixels each.
+10. To help the visualisation of MELVIN's position, the grid on the black plane consists of squares with dimensions 1000x1000 pixels each.
