@@ -12,7 +12,7 @@ def get_coords(filename):
 canvas_width, canvas_height = 21600, 10800
 
 
-path = 'D:/Onedrive-ilias/OneDrive/Έγγραφα/CIARC 2024/images_new/'
+path = '' # Fill with the path to the folder that contains the images
 images = [f for f in os.listdir(path) if os.path.isfile(path + f)]
 
 images_info = []
@@ -23,7 +23,6 @@ for name in images:
   images_info.append({'x': x, 'y': y, 'image': img})
   xprev, yprev = x, y
 
-# canvas = Image.open('D:/Onedrive-ilias/OneDrive/Έγγραφα/CIARC 2024/onlyold.png')
 canvas = Image.new('RGB', (canvas_width, canvas_height), color=(255, 255, 255))
 
 for info in images_info:
@@ -31,5 +30,5 @@ for info in images_info:
   y_offset = info['y'] - 500
   canvas.paste(info['image'], (x_offset, y_offset))
 
-output = 'D:/Onedrive-ilias/OneDrive/Έγγραφα/CIARC 2024/total_onlynew_corr2.png'
+output = '' # Fill with the path to the output folder
 canvas.save(output, format = 'PNG')

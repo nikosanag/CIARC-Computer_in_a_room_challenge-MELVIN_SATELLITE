@@ -212,8 +212,8 @@ def image_to_bitmatrix(image_path, output_file, compress=False):
     print(f"BitMatrix saved to {output_file}")
 
 
-
-image_path = 'D:/Desktop/CIARC 2024/part1/stitch_resutls/SAFE_MAP_4.png'
-output_file = 'backup_map.bmap'
-image_to_bitmatrix(image_path, output_file)
+if __name__ == "__main__":
+    image_path = '' # Fill with the path to the folder that contains the stitched map
+    output_file = '' # Fill with the path to the output folder
+    image_to_bitmatrix(image_path, output_file)
 
