@@ -224,13 +224,13 @@ def stitch_zoned(top_left, bottom_right, specific_files, final_name):
     if DEBUG:
         print(f"Successfully stitched {len(stitched_images)} images")
     
-    # Save the panorama
-    panorama_bytes = get_zoned_bytes(canvas)
+    # Save the map
+    map_bytes = get_zoned_bytes(canvas)
     with open(final_name, "wb") as f:
-        f.write(panorama_bytes)
+        f.write(map_bytes)
 
     if DEBUG:
-        print("Saved panorama to custom_panorama.png")
+        print("Saved map to custom_map.png")
 
 if __name__ == '__main__':
     # Provide a list of filenames to stitch

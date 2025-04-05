@@ -17,7 +17,7 @@ def get_coords(filename):
 canvas_width, canvas_height = 21600, 10800
 
 # Path to images
-path = 'D:/Onedrive-ilias/OneDrive/Έγγραφα/CIARC 2024/images_new/'
+path = '' # Fill with the path to the folder that contains the images
 images = [f for f in os.listdir(path) if os.path.isfile(path + f)]
 
 images_info = []
@@ -49,5 +49,5 @@ for info in images_info:
     canvas.paste(info['image'], (x_offset, y_offset))
 
 # Save the final stitched image
-output = 'D:/Onedrive-ilias/OneDrive/Έγγραφα/CIARC 2024/total_onlynew_corr2.png'
+output = '' # Fill with the path to the output folder
 canvas.save(output, format='PNG')

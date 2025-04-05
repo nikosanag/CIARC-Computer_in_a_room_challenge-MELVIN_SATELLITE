@@ -72,12 +72,12 @@ The **training phase** folder contains code used during the training process.
 
 ## Members of the Team 
 1. NIKOLAOS ANAGNOSTOU [nikos.r.anagnostou@gmail.com]
-2. ILIAS MAKRAS [iliasmakras@gmail.com]
+2. ILIAS MAKRAS [ilias.makras@gmail.com]
 3. NIKOLAOS LAPPAS [nikolas.lappas.2003@gmail.com]
 4. IOANNIS MARIOS MAVROMATIS [giamavro@gmail.com]
 5. PETROS VITALIS [minuspetran@gmail.com]
 
->Please contact for any questions or issues
+>Please contact us for any questions or issues
 
 
 

@@ -104,8 +104,8 @@ def find_sprite(stitched_map_path, input_photo_path):
 
 
 if __name__ == '__main__':
-    stitched_map_path = "" # Your stitched map path here
-    folder_path = ""  # Your images folder path here
+    stitched_map_path = "" # Fill with the stitched map path here
+    folder_path = ""  # Fill with your images folder path here
 
     max_x = 0
     max_y = 0

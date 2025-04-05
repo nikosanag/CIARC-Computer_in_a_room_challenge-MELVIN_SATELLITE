@@ -28,7 +28,6 @@ def capture_and_stitch(canvas):
     response = requests.get(f"{MELVIN_BASE_URL}/image")
     response.raise_for_status()
     
-    lens_to_precision = {'wide': '1', 'normal': '8', 'narrow': '6'}
     lens_size = {'wide': 1000, 'normal': 800, 'narrow': 600}
     
     if DEBUG:
@@ -84,12 +83,12 @@ def capture_and_stitch(canvas):
     return img
 
 
-''' 
-@params
-    canvas: the canvas 21600x10800
-'''
 def get_canvas_bytes(canvas, format='.png', quality=90):
-    """Convert the entire stitched canvas to bytes."""
+    """
+    Convert the entire stitched canvas to bytes.
+    
+    :param canvas: the 21600x10800 canvas
+    """
     success, buffer = cv.imencode(format, canvas, [cv.IMWRITE_JPEG_QUALITY, quality])
     if success:
         return buffer.tobytes()
