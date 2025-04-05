@@ -15,6 +15,10 @@ GREEN_CIRCLE_RADIUS = 75
 PRUNING_RESIDUAL_THRESHOLD = 50
 MIN_SAMPLE_POINTS = 3
 
+'''
+This is a method that uses pruning. The program discriminates between pings and ignores the ones considered outliers. 
+It was not used in the evaluation phase as it needs an unrealistically large number of pings to work
+'''
 
 def parse_data(data_lines):
     pattern = r'\[SUCCESS\] PING for Beacon with ID: (\d+) found at (\d+) , (\d+), with actual distance: (\d+) - Timestamp: ([\d-]+\s[\d:.]+)'

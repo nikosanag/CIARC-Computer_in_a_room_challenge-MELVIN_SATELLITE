@@ -33,6 +33,8 @@ In this challenge of esa we were called to create an autonomous system that mana
 4. **Install dependancies:**
     ```sh
     pip install -r requirements.txt
+    ```
+    These are the dependencies needed to run everything inside the "src" folder. Other programs that run outside of MELVIN might need other dependencies. Please install all the missing imports in order to run these programs.
 
 
 ## Usage

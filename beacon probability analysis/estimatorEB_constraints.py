@@ -8,6 +8,11 @@ from scipy.optimize import minimize
 
 DEBUG = True
 
+'''
+This method takes into account the previous (unsuccessful) submission and ignores some points that are within a ceratain radius (150px)
+from the wrongly guessed beacon position.
+It was not used in the evaluation phase because the results were not that accurate.
+'''
 
 def process_ping_data(file_path, prev_est=None, prev_est2=None):
     X_MAX, Y_MAX = 21600, 10800  # Maximum coordinates
@@ -59,47 +64,28 @@ def process_ping_data(file_path, prev_est=None, prev_est2=None):
         if not needs_adjustment:
             return target
 
-        # Case 1: Close to only one previous point → move along its vector
         if len(vectors) == 1:
             new_point = prev_points[0] + vectors[0] * desired_distance
 
-        # Case 2: Close to both previous points → move along resultant vector
-        # elif len(vectors) == 2:
-        #     resultant_vector = vectors[0] + vectors[1]
-        #     if np.linalg.norm(resultant_vector) > 0:
-        #         resultant_vector = resultant_vector / np.linalg.norm(resultant_vector)  # Normalize
-        #     else:
-        #         direction = np.array([vectors[1][1] - vectors[0][1], vectors[1][0] - vectors[0][0]])  # [Δy, -Δx] → κάθετο διάνυσμα
-        #         if np.linalg.norm(direction) > 0:
-        #             resultant_vector = direction / np.linalg.norm(direction)
-        #         else:
-        #             resultant_vector = np.array([0, 1])  # Fallback
-        #     new_point = current_point + resultant_vector * desired_distance
         elif len(vectors) == 2:
-            # Υπολογισμός του διανύσματος που ενώνει τα prev_points
             direction_vector = prev_points[1] - prev_points[0]
 
-            # Δημιουργία κάθετων διανυσμάτων
-            perp_vector1 = np.array([-direction_vector[1], direction_vector[0]])  # Δεξιόστροφο
-            perp_vector2 = np.array([direction_vector[1], -direction_vector[0]])  # Αριστερόστροφο
+            perp_vector1 = np.array([-direction_vector[1], direction_vector[0]]) 
+            perp_vector2 = np.array([direction_vector[1], -direction_vector[0]])  
 
-            # Κανονικοποίηση
             if np.linalg.norm(perp_vector1) > 0:
                 perp_vector1 = perp_vector1 / np.linalg.norm(perp_vector1)
             if np.linalg.norm(perp_vector2) > 0:
                 perp_vector2 = perp_vector2 / np.linalg.norm(perp_vector2)
 
-            # Επιλογή της φοράς που πλησιάζει το optimal_point
             new_candidate1 = current_point + perp_vector1 * desired_distance
             new_candidate2 = current_point + perp_vector2 * desired_distance
 
-            # Επιλογή του διανύσματος που φέρνει το σημείο πιο κοντά στο optimal_point
             if np.linalg.norm(new_candidate1 - optimal_point) < np.linalg.norm(new_candidate2 - optimal_point):
                 resultant_vector = perp_vector1
             else:
                 resultant_vector = perp_vector2
 
-            # Νέο σημείο
             new_point = current_point + resultant_vector * desired_distance
 
         else:

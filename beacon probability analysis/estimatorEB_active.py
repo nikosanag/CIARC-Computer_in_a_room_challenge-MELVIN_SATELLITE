@@ -9,6 +9,9 @@ from scipy.optimize import minimize
 
 DEBUG = False
 
+'''
+The main logic used in the evaluation phase. Its logic is described in the report.
+'''
 
 def find_solution():
     file_path = 'ping_log.txt'
@@ -21,11 +24,6 @@ def find_solution():
 
     # Store points by ID
     points_by_id = {}
-
-    def distance_to_circle(point, circle_center, radius):
-        dist_to_center = np.sqrt((point[0] - circle_center[0]) ** 2 + (point[1] - circle_center[1]) ** 2)
-        return abs(dist_to_center - radius)
-
 
     def objective_function(point, unique_points):
         x, y = point
